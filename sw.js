@@ -1,4 +1,5 @@
-const CACHE_NAME = "locked-in-v3";
+// I-bump ang number na ito (v4, v5, ...) tuwing may binago ka sa files
+const CACHE_NAME = "locked-in-v4";
 
 const FILES_TO_CACHE = [
     "./",
@@ -36,16 +37,15 @@ self.addEventListener("activate", event => {
 
 });
 
+// NETWORK-FIRST: laging kukunin muna ang pinakabagong file.
+// Kung offline, saka lang gagamitin ang cache.
 self.addEventListener("fetch", event => {
 
     if (event.request.method !== "GET") return;
 
     event.respondWith(
-        caches.match(event.request).then(cached => {
-
-            if (cached) return cached;
-
-            return fetch(event.request).then(response => {
+        fetch(event.request)
+            .then(response => {
 
                 if (
                     response &&
@@ -61,9 +61,12 @@ self.addEventListener("fetch", event => {
 
                 return response;
 
-            });
-
-        }).catch(() => caches.match("./index.html"))
+            })
+            .catch(() =>
+                caches.match(event.request).then(cached =>
+                    cached || caches.match("./index.html")
+                )
+            )
     );
 
 });
