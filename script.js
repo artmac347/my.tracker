@@ -1,9 +1,11 @@
+// ========================================
+// LOCKED IN. V3 - HABIT TRACKER
+// ========================================
+
 
 // ========================================
-// LOCKED IN. V2 - HABIT TRACKER
-// ========================================
-
 // ELEMENTS
+// ========================================
 
 const habitForm = document.getElementById("habitForm");
 const habitInput = document.getElementById("habitInput");
@@ -25,10 +27,21 @@ const weeklyChart = document.getElementById("weeklyChart");
 const weeklyPercent = document.getElementById("weeklyPercent");
 const weeklyCompleted = document.getElementById("weeklyCompleted");
 
+// OPTIONAL: kung may element ka na id="weeklyRange"
+// (yung "LAST 7 DAYS" label), mag-a-update siya ng
+// "Nov 2 – Nov 8". Kung wala, walang mangyayari.
+const weeklyRange = document.getElementById("weeklyRange");
 
-// LOCAL DATE HELPER
+const prevMonth = document.getElementById("prevMonth");
+const nextMonth = document.getElementById("nextMonth");
+
+
+// ========================================
+// DATE SYSTEM
+// ========================================
 
 function getLocalDate(date = new Date()) {
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -36,10 +49,22 @@ function getLocalDate(date = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
+function parseDate(dateKey) {
+
+    const [year, month, day] = dateKey.split("-").map(Number);
+
+    return new Date(year, month - 1, day);
+}
+
 const today = getLocalDate();
 
+let selectedDate = today;
+let calendarDate = new Date();
 
+
+// ========================================
 // STORAGE
+// ========================================
 
 let habits = JSON.parse(
     localStorage.getItem("lockedInHabits")
@@ -52,37 +77,29 @@ let history = JSON.parse(
 let lastDate = localStorage.getItem("lockedInDate");
 
 
-// RESET COMPLETION ON A NEW DAY
+// ========================================
+// NEW DAY RESET
+// ========================================
 
 if (lastDate !== today) {
-
-    if (lastDate) {
-        const previous = new Date(lastDate + "T00:00:00");
-        const current = new Date(today + "T00:00:00");
-
-        const difference = Math.round(
-            (current - previous) / 86400000
-        );
-
-        if (difference > 1) {
-            // Missed days do not count toward streak.
-        }
-    }
 
     habits = habits.map(habit => ({
         ...habit,
         completed: false
     }));
 
-    localStorage.setItem("lockedInDate", today);
     localStorage.setItem(
         "lockedInHabits",
         JSON.stringify(habits)
     );
+
+    localStorage.setItem("lockedInDate", today);
 }
 
 
+// ========================================
 // DATE DISPLAY
+// ========================================
 
 currentDate.textContent = new Date().toLocaleDateString(
     "en-US",
@@ -94,7 +111,9 @@ currentDate.textContent = new Date().toLocaleDateString(
 );
 
 
-// SAVE CURRENT DAY HISTORY
+// ========================================
+// SAVE HISTORY
+// ========================================
 
 function saveTodayHistory() {
 
@@ -105,8 +124,8 @@ function saveTodayHistory() {
     ).length;
 
     history[today] = {
-        total: total,
-        completed: completed,
+        total,
+        completed,
         habits: habits.map(habit => ({
             name: habit.name,
             completed: habit.completed
@@ -127,11 +146,16 @@ function saveTodayHistory() {
 }
 
 
-// SAVE ALL DATA
+// ========================================
+// SAVE DATA
+// ========================================
 
 function saveData() {
+
     saveTodayHistory();
+
     renderAll();
+
 }
 
 
@@ -153,6 +177,7 @@ function renderHabits() {
             </div>
         `;
 
+        return;
     }
 
     habits.forEach((habit, index) => {
@@ -179,12 +204,10 @@ function renderHabits() {
 
         });
 
-
         const name = document.createElement("span");
 
         name.className = "habit-name";
         name.textContent = habit.name;
-
 
         const deleteButton = document.createElement("button");
 
@@ -199,7 +222,6 @@ function renderHabits() {
             saveData();
 
         });
-
 
         item.appendChild(checkbox);
         item.appendChild(name);
@@ -225,7 +247,7 @@ habitForm.addEventListener("submit", event => {
     if (!name) return;
 
     habits.push({
-        name: name,
+        name,
         completed: false
     });
 
@@ -237,7 +259,7 @@ habitForm.addEventListener("submit", event => {
 
 
 // ========================================
-// DAILY PROGRESS
+// DAILY PROGRESS (laging para sa TODAY)
 // ========================================
 
 function updateProgress() {
@@ -259,38 +281,54 @@ function updateProgress() {
     progressText.textContent =
         `${completed} of ${total} habits completed`;
 
-    habitCount.textContent =
-        `${total} HABITS`;
+    habitCount.textContent = `${total} HABITS`;
 
 }
 
 
 // ========================================
-// STREAK SYSTEM
+// HISTORICAL STREAK SYSTEM
 // ========================================
 
 function updateStreak() {
 
     let streak = 0;
 
-    const todayRecord = history[today];
+    let date = parseDate(selectedDate);
 
-    // If today is not completed yet,
-    // start checking from yesterday.
+    const selectedRecord = history[selectedDate];
 
-    let date = new Date(today + "T00:00:00");
+    if (selectedDate === today) {
 
-    if (
-        !todayRecord ||
-        todayRecord.total === 0 ||
-        todayRecord.completed !== todayRecord.total
-    ) {
-        date.setDate(date.getDate() - 1);
+        if (
+            !selectedRecord ||
+            selectedRecord.total === 0 ||
+            selectedRecord.completed !== selectedRecord.total
+        ) {
+
+            date.setDate(date.getDate() - 1);
+
+        }
+
+    } else {
+
+        if (
+            !selectedRecord ||
+            selectedRecord.total === 0 ||
+            selectedRecord.completed !== selectedRecord.total
+        ) {
+
+            streakCount.textContent = 0;
+            return;
+
+        }
+
     }
 
     while (true) {
 
         const dateKey = getLocalDate(date);
+
         const record = history[dateKey];
 
         if (
@@ -298,7 +336,9 @@ function updateStreak() {
             record.total === 0 ||
             record.completed !== record.total
         ) {
+
             break;
+
         }
 
         streak++;
@@ -313,141 +353,8 @@ function updateStreak() {
 
 
 // ========================================
-// MONTHLY CALENDAR
-// ========================================
-
-let calendarDate = new Date(
-    new Date(today + "T00:00:00").getFullYear(),
-    new Date(today + "T00:00:00").getMonth(),
-    1
-);
-
-let selectedDate = today;
-
-function renderCalendar() {
-
-    calendarGrid.innerHTML = "";
-
-    const year = calendarDate.getFullYear();
-    const month = calendarDate.getMonth();
-
-    monthLabel.textContent = calendarDate.toLocaleDateString(
-        "en-US",
-        {
-            month: "long",
-            year: "numeric"
-        }
-    );
-
-    const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
-
-    weekdays.forEach(day => {
-
-        const element = document.createElement("div");
-
-        element.className = "calendar-day weekday";
-        element.textContent = day;
-
-        calendarGrid.appendChild(element);
-
-    });
-
-    const firstDay = new Date(year, month, 1).getDay();
-
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-
-    // EMPTY CELLS
-
-    for (let i = 0; i < firstDay; i++) {
-
-        const empty = document.createElement("div");
-
-        empty.className = "calendar-day empty";
-
-        calendarGrid.appendChild(empty);
-
-    }
-
-
-    // CALENDAR DATES
-
-    for (let day = 1; day <= daysInMonth; day++) {
-
-        const dateKey =
-            `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-        const record = history[dateKey];
-
-        const cell = document.createElement("button");
-
-        cell.type = "button";
-        cell.className = "calendar-day";
-        cell.textContent = day;
-
-        if (dateKey === today) {
-            cell.classList.add("today");
-        }
-
-        if (dateKey === selectedDate) {
-            cell.classList.add("selected");
-        }
-
-        if (record && record.total > 0) {
-
-            if (record.completed === record.total) {
-                cell.classList.add("complete");
-            } else {
-                cell.classList.add("partial");
-            }
-
-        }
-
-        cell.addEventListener("click", () => {
-
-            selectedDate = dateKey;
-
-            renderCalendar();
-            showSelectedDay(dateKey);
-
-        });
-
-        calendarGrid.appendChild(cell);
-
-    }
-
-}
-
-
-// CALENDAR NAVIGATION
-
-document.getElementById("prevMonth").addEventListener(
-    "click",
-    () => {
-
-        calendarDate.setMonth(calendarDate.getMonth() - 1);
-
-        renderCalendar();
-
-    }
-);
-
-document.getElementById("nextMonth").addEventListener(
-    "click",
-    () => {
-
-        calendarDate.setMonth(calendarDate.getMonth() + 1);
-
-        renderCalendar();
-
-    }
-);
-
-
-// ========================================
 // SELECTED DAY HISTORY
 // ========================================
-
 
 function showSelectedDay(dateKey) {
 
@@ -455,15 +362,17 @@ function showSelectedDay(dateKey) {
 
     const record = history[dateKey];
 
-    const readableDate = new Date(
-        dateKey + "T00:00:00"
-    ).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric"
-    });
+    const readableDate = parseDate(dateKey).toLocaleDateString(
+        "en-US",
+        {
+            month: "long",
+            day: "numeric",
+            year: "numeric"
+        }
+    );
 
     const heading = document.createElement("strong");
+
     heading.textContent = readableDate;
 
     selectedDay.appendChild(heading);
@@ -471,9 +380,11 @@ function showSelectedDay(dateKey) {
     if (!record) {
 
         const message = document.createElement("p");
+
         message.textContent = "No recorded habits.";
 
         selectedDay.appendChild(message);
+
         return;
     }
 
@@ -484,7 +395,7 @@ function showSelectedDay(dateKey) {
 
     selectedDay.appendChild(summary);
 
-    record.habits.forEach(habit => {
+    (record.habits || []).forEach(habit => {
 
         const line = document.createElement("p");
 
@@ -500,6 +411,8 @@ function showSelectedDay(dateKey) {
 
 // ========================================
 // WEEKLY STATISTICS
+// Sumusunod sa selectedDate (7 days na
+// nagtatapos sa araw na pinindot mo).
 // ========================================
 
 function renderWeeklyStats() {
@@ -511,17 +424,22 @@ function renderWeeklyStats() {
 
     const days = [];
 
+    const anchorDate = parseDate(selectedDate);
+
     for (let i = 6; i >= 0; i--) {
 
-        const date = new Date(today + "T00:00:00");
-
-        date.setDate(date.getDate() - i);
+        const date = new Date(
+            anchorDate.getFullYear(),
+            anchorDate.getMonth(),
+            anchorDate.getDate() - i
+        );
 
         const dateKey = getLocalDate(date);
 
         const record = history[dateKey];
 
         const completed = record ? record.completed : 0;
+
         const total = record ? record.total : 0;
 
         const percentage = total > 0
@@ -532,20 +450,26 @@ function renderWeeklyStats() {
         totalHabits += total;
 
         days.push({
+            dateKey,
+            date,
             name: date.toLocaleDateString("en-US", {
                 weekday: "short"
             }),
-            percentage: percentage
+            percentage
         });
 
     }
-
 
     days.forEach(day => {
 
         const column = document.createElement("div");
 
         column.className = "chart-column";
+
+        // Naka-highlight ang araw na pinindot
+        if (day.dateKey === selectedDate) {
+            column.classList.add("active");
+        }
 
         column.innerHTML = `
             <div class="chart-track">
@@ -556,20 +480,203 @@ function renderWeeklyStats() {
             <small>${day.name}</small>
         `;
 
+        // Pwede ring pindutin ang bar para lumipat ng araw
+        column.style.cursor = "pointer";
+
+        column.addEventListener("click", () => {
+
+            calendarDate = new Date(
+                day.date.getFullYear(),
+                day.date.getMonth(),
+                1
+            );
+
+            selectDate(day.dateKey);
+
+        });
+
         weeklyChart.appendChild(column);
 
     });
 
-
     const average = totalHabits > 0
-        ? Math.round((totalCompleted / totalHabits) * 100)
+        ? Math.round(
+            (totalCompleted / totalHabits) * 100
+        )
         : 0;
 
     weeklyPercent.textContent = average + "%";
 
     weeklyCompleted.textContent = totalCompleted;
 
+    if (weeklyRange) {
+
+        const fmt = { month: "short", day: "numeric" };
+
+        weeklyRange.textContent =
+            days[0].date.toLocaleDateString("en-US", fmt) +
+            " – " +
+            days[6].date.toLocaleDateString("en-US", fmt);
+
+    }
+
 }
+
+
+// ========================================
+// MONTHLY CALENDAR
+// ========================================
+
+function renderCalendar() {
+
+    calendarGrid.innerHTML = "";
+
+    const year = calendarDate.getFullYear();
+
+    const month = calendarDate.getMonth();
+
+    monthLabel.textContent = calendarDate.toLocaleDateString(
+        "en-US",
+        {
+            month: "long",
+            year: "numeric"
+        }
+    );
+
+    const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+
+    weekdays.forEach(day => {
+
+        const cell = document.createElement("div");
+
+        cell.className = "calendar-day weekday";
+
+        cell.textContent = day;
+
+        calendarGrid.appendChild(cell);
+
+    });
+
+    const firstDay = new Date(year, month, 1).getDay();
+
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDay; i++) {
+
+        const empty = document.createElement("div");
+
+        empty.className = "calendar-day empty";
+
+        calendarGrid.appendChild(empty);
+
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+
+        const date = new Date(year, month, day);
+
+        const dateKey = getLocalDate(date);
+
+        const cell = document.createElement("button");
+
+        cell.type = "button";
+
+        cell.className = "calendar-day";
+
+        cell.textContent = day;
+
+        const record = history[dateKey];
+
+        if (dateKey === today) {
+            cell.classList.add("today");
+        }
+
+        if (dateKey === selectedDate) {
+            cell.classList.add("selected");
+        }
+
+        if (record && record.total > 0) {
+
+            if (record.completed === record.total) {
+
+                cell.classList.add("complete");
+
+            } else {
+
+                cell.classList.add("partial");
+
+            }
+
+        }
+
+        if (dateKey > today) {
+
+            cell.disabled = true;
+
+        } else {
+
+            cell.addEventListener("click", () => {
+
+                selectDate(dateKey);
+
+            });
+
+        }
+
+        calendarGrid.appendChild(cell);
+
+    }
+
+}
+
+
+// ========================================
+// SELECT DATE - MAIN UPDATE
+// ========================================
+
+function selectDate(dateKey) {
+
+    selectedDate = dateKey;
+
+    renderCalendar();
+
+    showSelectedDay(selectedDate);
+
+    updateStreak();
+
+    renderWeeklyStats();
+
+}
+
+
+// ========================================
+// CALENDAR NAVIGATION
+// ========================================
+
+prevMonth.addEventListener("click", () => {
+
+    calendarDate.setDate(1);
+
+    calendarDate.setMonth(
+        calendarDate.getMonth() - 1
+    );
+
+    renderCalendar();
+
+});
+
+
+nextMonth.addEventListener("click", () => {
+
+    calendarDate.setDate(1);
+
+    calendarDate.setMonth(
+        calendarDate.getMonth() + 1
+    );
+
+    renderCalendar();
+
+});
 
 
 // ========================================
@@ -593,24 +700,40 @@ function renderAll() {
 }
 
 
+// ========================================
 // INITIALIZE
+// ========================================
 
 saveTodayHistory();
 
 renderAll();
 
- // REGISTER SERVICE WORKER
+
+// ========================================
+// SERVICE WORKER
+// ========================================
 
 if ("serviceWorker" in navigator) {
 
     window.addEventListener("load", () => {
 
         navigator.serviceWorker.register("./sw.js")
+
             .then(() => {
-                console.log("LOCKED IN: Offline support ready.");
+
+                console.log(
+                    "LOCKED IN: Offline support ready."
+                );
+
             })
+
             .catch(error => {
-                console.error("Service Worker Error:", error);
+
+                console.error(
+                    "Service Worker Error:",
+                    error
+                );
+
             });
 
     });
