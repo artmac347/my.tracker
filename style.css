@@ -10,6 +10,7 @@
     --white: #f5f5f7;
     --muted: #858590;
     --green: #45c98b;
+    --amber: #f5a623;
 }
 
 * {
@@ -38,8 +39,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 0 30px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 0 20px;
 }
 
 .brand {
@@ -68,10 +68,62 @@ body {
     letter-spacing: 1px;
 }
 
+/* TABS */
+
+.tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.tab {
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.tab.active {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+}
+
+#panels {
+    scroll-margin-top: 70px;
+}
+
+.panel {
+    display: none;
+}
+
+.panel.active {
+    display: block;
+    animation: appear 0.25s ease;
+}
+
 /* WELCOME */
 
 .welcome {
-    padding: 40px 0 30px;
+    padding: 35px 0 30px;
 }
 
 .eyebrow {
@@ -164,7 +216,7 @@ body {
     font-size: 19px;
 }
 
-#progressPercent {
+.progress-percent {
     color: var(--red);
     font-family: 'Space Grotesk', sans-serif;
     font-size: 29px;
@@ -179,7 +231,7 @@ body {
     margin: 22px 0 12px;
 }
 
-#progressBar {
+.progress-fill {
     width: 0%;
     height: 100%;
     background: var(--red);
@@ -195,6 +247,10 @@ body {
 
 /* HABITS */
 
+.habits-section {
+    margin-bottom: 35px;
+}
+
 .section-heading {
     display: flex;
     justify-content: space-between;
@@ -207,7 +263,7 @@ body {
     font-size: 23px;
 }
 
-#habitCount {
+.item-count {
     color: var(--muted);
     font-size: 10px;
     letter-spacing: 1px;
@@ -368,9 +424,9 @@ body {
     }
 }
 
- 
+
 /* =================================
-   LOCKED IN V2 - CALENDAR
+   CALENDAR
 ================================= */
 
 .calendar-section,
@@ -422,6 +478,7 @@ body {
     border-radius: 9px;
     background: var(--card-light);
     color: var(--muted);
+    font-family: inherit;
     font-size: 11px;
     border: 1px solid transparent;
 }
@@ -445,6 +502,12 @@ body {
     border-color: rgba(237, 37, 78, 0.3);
 }
 
+.calendar-day.off {
+    background: #26262f;
+    color: #b4b4c0;
+    border-color: #3a3a46;
+}
+
 .calendar-day.today {
     outline: 1px solid var(--red);
     outline-offset: 2px;
@@ -456,6 +519,11 @@ body {
 
 .calendar-day:not(.weekday):not(.empty) {
     cursor: pointer;
+}
+
+.calendar-day:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .calendar-day.empty {
@@ -491,6 +559,10 @@ body {
     background: var(--red);
 }
 
+.legend-off {
+    background: #8a8a98;
+}
+
 .legend-empty {
     background: #555560;
 }
@@ -503,6 +575,10 @@ body {
     color: var(--muted);
     font-size: 12px;
     line-height: 1.7;
+}
+
+.selected-day strong {
+    color: var(--white);
 }
 
 /* WEEKLY STATISTICS */
@@ -584,10 +660,19 @@ body {
     font-size: 9px;
 }
 
+.chart-column.active small {
+    color: #fff;
+}
+
+.chart-column.active .chart-fill {
+    box-shadow: 0 0 0 2px #fff;
+}
+
 .stats-bottom {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     border-top: 1px solid var(--border);
     margin-top: 20px;
     padding-top: 15px;
@@ -600,7 +685,288 @@ body {
 
 .stats-bottom strong {
     color: var(--green);
-    font-size: 17px;
+    font-size: 15px;
+    text-align: right;
+}
+
+
+/* =================================
+   CONSTRUCTION WORK LOG
+================================= */
+
+.work-stats {
+    margin-bottom: 35px;
+}
+
+.work-stats .chart-fill {
+    background: var(--amber);
+}
+
+.work-stats .stats-top h3,
+.rec-work h3 {
+    color: var(--amber);
+}
+
+.work-stats .stats-icon {
+    background: rgba(245, 166, 35, 0.15);
+    color: var(--amber);
+    font-size: 22px;
+}
+
+.entry {
+    margin-top: 18px;
+    padding: 14px;
+    background: var(--card-light);
+    border-radius: 12px;
+}
+
+.entry-date {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.toggle-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.toggle-btn.on {
+    background: var(--green);
+    border-color: var(--green);
+    color: #07140e;
+}
+
+.toggle-btn.on.off-btn {
+    background: #3a3a46;
+    border-color: #4c4c5a;
+    color: #fff;
+}
+
+.field {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: #fff;
+    padding: 13px;
+    font-family: inherit;
+    font-size: 13px;
+    margin-bottom: 10px;
+    outline: none;
+}
+
+.field:focus {
+    border-color: var(--red);
+}
+
+.entry-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.primary-btn,
+.ghost-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.primary-btn {
+    background: var(--red);
+    border: none;
+    color: #fff;
+}
+
+.ghost-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+}
+
+.ghost-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.work-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.work-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 14px;
+    color: var(--white);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.work-row .row-main {
+    min-width: 0;
+}
+
+.work-row .row-date {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.work-row .row-site {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+}
+
+.work-row .row-pay {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.work-row .row-pay.is-off {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.work-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px;
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+}
+
+
+/* =================================
+   ALL RECORDS
+================================= */
+
+.calendar-day.rec {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+.dots {
+    display: flex;
+    gap: 3px;
+}
+
+.dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #33333d;
+}
+
+.dot.good {
+    background: var(--green);
+}
+
+.dot.part {
+    background: var(--red);
+}
+
+.dot.work {
+    background: var(--amber);
+}
+
+.dot.off {
+    background: #8a8a98;
+}
+
+.rec-note {
+    color: var(--muted);
+    font-size: 10px;
+    margin-top: 14px;
+    line-height: 1.6;
+}
+
+.rec-card {
+    margin-bottom: 12px;
+}
+
+.rec-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.rec-top small {
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    font-size: 9px;
+}
+
+.rec-top h3 {
+    color: var(--red);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    margin-top: 4px;
+}
+
+.rec-sub {
+    color: var(--muted);
+    font-size: 11px;
+    text-align: right;
+}
+
+.weekly-chart.mini {
+    height: 90px;
+    margin-top: 16px;
+}
+
+.mini .chart-track {
+    height: 56px;
+}
+
+.rec-work .chart-fill {
+    background: var(--amber);
+}
+
+.rec-vit h3 {
+    color: var(--green);
+}
+
+.rec-vit .chart-fill {
+    background: var(--green);
 }
 
 @media (max-width: 380px) {
