@@ -29,9 +29,17 @@
             </div>
         </header>
 
+        <!-- TABS -->
+        <nav class="tabs" id="tabs">
+            <button type="button" class="tab active" data-tab="habits">My Habits</button>
+            <button type="button" class="tab" data-tab="work">Construction Work</button>
+            <button type="button" class="tab" data-tab="vitamins">Daily Vitamins</button>
+            <button type="button" class="tab" data-tab="records">All Records</button>
+        </nav>
+
         <!-- GREETING -->
         <section class="welcome">
-            <p class="eyebrow">YOUR PERSONAL HABIT TRACKER</p>
+            <p class="eyebrow">YOUR PERSONAL TRACKER</p>
 
             <h1>Become better.<br>
                 <span>Every single day.</span>
@@ -43,159 +51,8 @@
             </p>
         </section>
 
-        <!-- DATE -->
-        <section class="date-section">
-            <div>
-                <p class="eyebrow">TODAY</p>
-                <h2 id="currentDate">Loading...</h2>
-            </div>
-
-            <div class="streak">
-                <span>🔥</span>
-                <div>
-                    <strong id="streakCount">0</strong>
-                    <small>DAY STREAK</small>
-                </div>
-            </div>
-        </section>
-
-        <!-- PROGRESS -->
-        <section class="progress-card">
-
-            <div class="progress-heading">
-                <div>
-                    <p class="eyebrow">DAILY PROGRESS</p>
-                    <h2>Stay consistent.</h2>
-                </div>
-
-                <span id="progressPercent">0%</span>
-            </div>
-
-            <div class="progress-track">
-                <div id="progressBar"></div>
-            </div>
-
-            <p class="progress-caption" id="progressText">
-                0 of 0 habits completed
-            </p>
-
-        </section>
-
-        <!-- HABITS -->
-        <section class="habits-section">
-
-            <div class="section-heading">
-                <div>
-                    <p class="eyebrow">YOUR ROUTINE</p>
-                    <h2>Daily Habits</h2>
-                </div>
-
-                <span id="habitCount">0 HABITS</span>
-            </div>
-
-            <!-- ADD HABIT -->
-            <form id="habitForm" class="habit-form">
-
-                <input
-                    type="text"
-                    id="habitInput"
-                    placeholder="Add a new habit..."
-                    maxlength="50"
-                    required
-                >
-
-                <button type="submit" id="addButton">
-                    +
-                </button>
-
-            </form>
-
-            <!-- HABIT LIST -->
-            <div id="habitList" class="habit-list">
-
-                <div class="empty-state">
-                    <span>✦</span>
-                    <p>No habits yet.</p>
-                    <small>Start building your routine today.</small>
-                </div>
-
-            </div>
-
-        </section>
-        
-        
-<!-- V2: MONTHLY CALENDAR -->
-
-<section class="calendar-section">
-
-    <div class="section-heading">
-        <div>
-            <p class="eyebrow">YOUR HISTORY</p>
-            <h2>Monthly Overview</h2>
-        </div>
-    </div>
-
-    <div class="calendar-card">
-
-        <div class="calendar-header">
-            <button id="prevMonth" type="button">‹</button>
-            <h3 id="monthLabel">Month Year</h3>
-            <button id="nextMonth" type="button">›</button>
-        </div>
-
-        <div class="calendar-grid" id="calendarGrid">
-        </div>
-
-        <div class="calendar-legend">
-            <span><i class="legend-complete"></i> Complete</span>
-            <span><i class="legend-partial"></i> Partial</span>
-            <span><i class="legend-empty"></i> No record</span>
-        </div>
-
-        <div id="selectedDay" class="selected-day">
-            Select a date to view its history.
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- V2: WEEKLY STATISTICS -->
-
-<section class="stats-section">
-
-    <div class="section-heading">
-        <div>
-            <p class="eyebrow">YOUR PERFORMANCE</p>
-            <h2>Weekly Statistics</h2>
-        </div>
-    </div>
-
-    <div class="stats-card">
-
-        <div class="stats-top">
-            <div>
-                <small>LAST 7 DAYS</small>
-                <h3 id="weeklyPercent">0%</h3>
-                <p>Average completion</p>
-            </div>
-
-            <div class="stats-icon">↗</div>
-        </div>
-
-        <div class="weekly-chart" id="weeklyChart">
-        </div>
-
-        <div class="stats-bottom">
-            <span>Completed habits</span>
-            <strong id="weeklyCompleted">0</strong>
-        </div>
-
-    </div>
-
-</section>
-
+        <!-- PANELS (ginagawa ng script.js) -->
+        <div id="panels"></div>
 
         <!-- FOOTER -->
         <footer class="footer">
