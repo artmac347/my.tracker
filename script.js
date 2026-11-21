@@ -2033,7 +2033,7 @@ const profileSection = makeSection("Profile");
 const nameInput = makeEl("input", "li-input");
 
 nameInput.type = "text";
-nameInput.placeholder = "Pangalan mo (hal. Macmac)";
+nameInput.placeholder = "your name";
 nameInput.maxLength = 24;
 nameInput.value = settings.name;
 
