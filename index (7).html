@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>LOCKED IN. | Habit Tracker</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#09090d">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+
+</head>
+
+<body>
+
+    <main class="app">
+
+        <!-- HEADER -->
+        <header class="header">
+            <div class="brand">
+                <span class="brand-icon">L.</span>
+                <span>LOCKED IN.</span>
+            </div>
+
+            <div class="profile">
+                <span>MY JOURNEY</span>
+            </div>
+        </header>
+
+        <!-- MENU BAR (☰ opens the side menu, script.js builds it) -->
+        <nav class="topbar" id="topbar">
+            <button type="button" class="menu-btn" id="menuBtn"
+                aria-label="Open menu" aria-expanded="false">☰</button>
+            <span class="topbar-title" id="sectionTitle">My daily task</span>
+        </nav>
+
+        <!-- GREETING -->
+        <section class="welcome">
+            <p class="eyebrow">YOUR PERSONAL TRACKER</p>
+          <img src="mac.jpg" alt="my photo">
+            <h1>Become better.<br>
+                <span>Every single day.</span>
+            </h1>
+
+
+
+            <p class="subtitle">
+                Small actions. Consistent progress.
+                Build the person you want to become.
+            </p>
+
+        </section>
+
+        <!-- PANELS (ginagawa ng script.js) -->
+        <div id="panels"></div>
+
+
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <p>DISCIPLINE TODAY. FREEDOM TOMORROW.</p>
+            <span>MADE FOR GROWTH.</span>
+        </footer>
+
+    </main>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
