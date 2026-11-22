@@ -29,30 +29,34 @@
             </div>
         </header>
 
-        <!-- TABS -->
-        <nav class="tabs" id="tabs">
-            <button type="button" class="tab active" data-tab="habits">My Habits</button>
-            <button type="button" class="tab" data-tab="work">Construction Work</button>
-            <button type="button" class="tab" data-tab="vitamins">Daily Vitamins</button>
-            <button type="button" class="tab" data-tab="records">All Records</button>
+        <!-- MENU BAR (☰ opens the side menu, script.js builds it) -->
+        <nav class="topbar" id="topbar">
+            <button type="button" class="menu-btn" id="menuBtn"
+                aria-label="Open menu" aria-expanded="false">☰</button>
+            <span class="topbar-title" id="sectionTitle">My daily task</span>
         </nav>
 
         <!-- GREETING -->
         <section class="welcome">
             <p class="eyebrow">YOUR PERSONAL TRACKER</p>
-
+          <img src="mac.jpg" alt="my photo">
             <h1>Become better.<br>
                 <span>Every single day.</span>
             </h1>
+
+
 
             <p class="subtitle">
                 Small actions. Consistent progress.
                 Build the person you want to become.
             </p>
+
         </section>
 
         <!-- PANELS (ginagawa ng script.js) -->
         <div id="panels"></div>
+
+
 
         <!-- FOOTER -->
         <footer class="footer">

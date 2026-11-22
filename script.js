@@ -1,7 +1,7 @@
-// ========================================
-// LOCKED IN. V5
-// Habits + Construction Work + Vitamins
-// + All Records + Settings
+ // ========================================
+// LOCKED IN. V6
+// Daily Task + Construction + Vitamins
+// + Money Manager + All Records + Settings
 // ========================================
 
 
@@ -10,7 +10,8 @@
 // ========================================
 
 const panelsHost = document.getElementById("panels");
-const tabsNav = document.getElementById("tabs");
+const menuBtn = document.getElementById("menuBtn");
+const sectionTitle = document.getElementById("sectionTitle");
 
 function getLocalDate(date = new Date()) {
 
@@ -91,12 +92,19 @@ const STORAGE_KEYS = [
     "lockedInVitaminsHistory",
     "lockedInVitaminsDate",
     "lockedInWork",
+    "lockedInWallets",
+    "lockedInTransactions",
+    "lockedInBudgets",
     "lockedInSettings"
 ];
+
+// Mga key na plain na petsa ang laman (hindi JSON)
+const DATE_KEYS = ["lockedInDate", "lockedInVitaminsDate"];
 
 let settings = {
     name: "",
     weekMode: "rolling", // "rolling" o "fixed"
+    workWallet: "",      // "" = unang wallet, "off" = huwag i-record
     ...readJSON("lockedInSettings", {})
 };
 
@@ -1296,9 +1304,13 @@ wEl("save").addEventListener("click", () => {
 
     renderWorkAll();
 
+    const paidTo = syncWorkTransaction(workSelected);
+
+    renderMoney();
+
     renderRecords();
 
-    showToast("Na-save ✓");
+    showToast(paidTo ? "Na-save ✓ · pumasok sa " + paidTo : "Na-save ✓");
 
 });
 
@@ -1315,6 +1327,10 @@ wEl("clear").addEventListener("click", () => {
     loadDraft();
 
     renderWorkAll();
+
+    syncWorkTransaction(workSelected);
+
+    renderMoney();
 
     renderRecords();
 
@@ -1369,6 +1385,1814 @@ const vitaminsTracker = createChecklist({
 
 
 // ========================================
+// MONEY MANAGER (Transactions + Balance)
+// ========================================
+
+const EXPENSE_CATEGORIES = [
+    "Pagkain", "Pamasahe", "Load", "Bills",
+    "Kalusugan", "Gamit", "Libangan", "Iba pa"
+];
+
+const INCOME_CATEGORIES = [
+    "Sahod", "Allowance", "Negosyo", "Regalo", "Iba pa"
+];
+
+const CATEGORY_ICONS = {
+    "Pagkain": "🍚",
+    "Pamasahe": "🚌",
+    "Load": "📱",
+    "Bills": "💡",
+    "Kalusugan": "💊",
+    "Gamit": "🛒",
+    "Libangan": "🎮",
+    "Iba pa": "✦",
+    "Sahod": "🛠",
+    "Allowance": "💵",
+    "Negosyo": "🏪",
+    "Regalo": "🎁"
+};
+
+function genId() {
+
+    return Date.now().toString(36) +
+        Math.random().toString(36).slice(2, 8);
+
+}
+
+function round2(value) {
+
+    return Math.round((Number(value) || 0) * 100) / 100;
+
+}
+
+function money(value) {
+
+    const v = round2(value);
+
+    return (v < 0 ? "−" : "") + "₱" +
+        Math.abs(v).toLocaleString("en-PH", { maximumFractionDigits: 2 });
+
+}
+
+function moneySigned(value) {
+
+    const v = round2(value);
+
+    return (v > 0 ? "+" : "") + money(v);
+
+}
+
+function isDateKey(value) {
+
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+}
+
+
+// ---------- Data ----------
+
+function saveWallets() {
+
+    localStorage.setItem("lockedInWallets", JSON.stringify(wallets));
+
+}
+
+function saveTransactions() {
+
+    localStorage.setItem(
+        "lockedInTransactions",
+        JSON.stringify(transactions)
+    );
+
+}
+
+function saveBudgets() {
+
+    localStorage.setItem("lockedInBudgets", JSON.stringify(budgets));
+
+}
+
+let wallets = readJSON("lockedInWallets", []);
+
+if (!Array.isArray(wallets)) wallets = [];
+
+wallets = wallets
+    .filter(w => w && typeof w.id === "string" && typeof w.name === "string")
+    .map(w => ({
+        id: w.id,
+        name: w.name,
+        opening: Number(w.opening) || 0
+    }));
+
+if (wallets.length === 0) {
+
+    wallets = [{ id: genId(), name: "Cash", opening: 0 }];
+
+    saveWallets();
+
+}
+
+let transactions = readJSON("lockedInTransactions", []);
+
+if (!Array.isArray(transactions)) transactions = [];
+
+transactions = transactions
+    .filter(t =>
+        t &&
+        typeof t.id === "string" &&
+        isDateKey(t.date) &&
+        Number(t.amount) > 0 &&
+        ["income", "expense", "transfer"].includes(t.type)
+    )
+    .map(t => ({ ...t, amount: Number(t.amount) }));
+
+let budgets = readJSON("lockedInBudgets", {});
+
+if (!budgets || typeof budgets !== "object" || Array.isArray(budgets)) {
+    budgets = {};
+}
+
+
+// ---------- Calculations ----------
+
+function walletById(id) {
+
+    return wallets.find(w => w.id === id);
+
+}
+
+function walletName(id) {
+
+    const w = walletById(id);
+
+    return w ? w.name : "—";
+
+}
+
+function walletBalance(id) {
+
+    const w = walletById(id);
+
+    if (!w) return 0;
+
+    let balance = Number(w.opening) || 0;
+
+    transactions.forEach(t => {
+
+        if (t.type === "income" && t.wallet === id) {
+
+            balance += t.amount;
+
+        } else if (t.type === "expense" && t.wallet === id) {
+
+            balance -= t.amount;
+
+        } else if (t.type === "transfer") {
+
+            if (t.wallet === id) balance -= t.amount;
+
+            if (t.toWallet === id) balance += t.amount;
+
+        }
+
+    });
+
+    return round2(balance);
+
+}
+
+function totalBalance() {
+
+    return round2(
+        wallets.reduce((sum, w) => sum + walletBalance(w.id), 0)
+    );
+
+}
+
+function monthKeyOf(date) {
+
+    return getLocalDate(date).slice(0, 7);
+
+}
+
+function txOfMonth(key) {
+
+    return transactions.filter(t => t.date.startsWith(key));
+
+}
+
+function sumTx(list) {
+
+    let income = 0;
+    let expense = 0;
+
+    list.forEach(t => {
+
+        if (t.type === "income") income += t.amount;
+
+        else if (t.type === "expense") expense += t.amount;
+
+    });
+
+    return { income: round2(income), expense: round2(expense) };
+
+}
+
+function daySums(dateKey) {
+
+    return sumTx(transactions.filter(t => t.date === dateKey));
+
+}
+
+function spentIn(category, key) {
+
+    return round2(
+        transactions
+            .filter(t =>
+                t.type === "expense" &&
+                t.category === category &&
+                t.date.startsWith(key)
+            )
+            .reduce((sum, t) => sum + t.amount, 0)
+    );
+
+}
+
+function walletFlow(id, key) {
+
+    let inflow = 0;
+    let outflow = 0;
+
+    transactions.forEach(t => {
+
+        if (!t.date.startsWith(key)) return;
+
+        if (t.type === "income" && t.wallet === id) inflow += t.amount;
+
+        else if (t.type === "expense" && t.wallet === id) outflow += t.amount;
+
+        else if (t.type === "transfer") {
+
+            if (t.toWallet === id) inflow += t.amount;
+
+            if (t.wallet === id) outflow += t.amount;
+
+        }
+
+    });
+
+    return { inflow: round2(inflow), outflow: round2(outflow) };
+
+}
+
+function budgetWarning(category, key) {
+
+    const limit = Number(budgets[category]);
+
+    if (!(limit > 0)) return "";
+
+    const spent = spentIn(category, key);
+
+    if (spent > limit) {
+
+        return `⚠ Lampas na sa budget ng ${category}: ` +
+            `${money(spent)} / ${money(limit)}`;
+
+    }
+
+    if (spent >= limit * 0.8) {
+
+        return `⚠ Malapit na sa budget ng ${category}: ` +
+            `${money(spent)} / ${money(limit)}`;
+
+    }
+
+    return "";
+
+}
+
+
+// ---------- Auto-record ng sahod mula sa Construction Work ----------
+
+function autoWorkWalletId() {
+
+    if (settings.workWallet === "off") return null;
+
+    if (walletById(settings.workWallet)) return settings.workWallet;
+
+    return wallets[0] ? wallets[0].id : null;
+
+}
+
+// Ibinabalik ang pangalan ng wallet kung may na-record/na-update na income.
+function syncWorkTransaction(dateKey) {
+
+    const record = workLog[dateKey];
+
+    const idx = transactions.findIndex(
+        t => t.source === "work" && t.workDate === dateKey
+    );
+
+    const pay = record ? round2(record.pay) : 0;
+
+    // Kapag Off / walang sahod / binura ang record, alisin ang income.
+    if (!record || !record.worked || !(pay > 0)) {
+
+        if (idx >= 0) {
+
+            transactions.splice(idx, 1);
+
+            saveTransactions();
+
+        }
+
+        return null;
+
+    }
+
+    const walletId = autoWorkWalletId();
+
+    // Naka-off ang auto-record: huwag galawin.
+    if (!walletId) return null;
+
+    if (idx >= 0) {
+
+        // Panatilihin ang wallet/category na binago mo mano-mano.
+        transactions[idx] = {
+            ...transactions[idx],
+            amount: pay,
+            date: dateKey,
+            note: record.site || "Construction work"
+        };
+
+    } else {
+
+        transactions.push({
+            id: genId(),
+            type: "income",
+            amount: pay,
+            category: "Sahod",
+            wallet: walletId,
+            date: dateKey,
+            note: record.site || "Construction work",
+            source: "work",
+            workDate: dateKey
+        });
+
+    }
+
+    saveTransactions();
+
+    return walletName(transactions[idx >= 0 ? idx : transactions.length - 1].wallet);
+
+}
+
+
+// ---------- Bottom sheet (para sa wallet, transfer, budget) ----------
+
+let activeSheet = null;
+
+function closeSheet() {
+
+    if (activeSheet) {
+
+        activeSheet.remove();
+
+        activeSheet = null;
+
+    }
+
+}
+
+function openSheet(cfg) {
+
+    closeSheet();
+
+    const sheetBackdrop = makeEl("div", "li-backdrop open");
+
+    const box = makeEl("div", "li-panel");
+
+    sheetBackdrop.appendChild(box);
+
+    const head = makeEl("div", "li-head");
+
+    head.appendChild(makeEl("h2", "", cfg.title));
+
+    const closeBtn = makeEl("button", "li-close", "✕");
+
+    closeBtn.type = "button";
+
+    closeBtn.addEventListener("click", closeSheet);
+
+    head.appendChild(closeBtn);
+
+    box.appendChild(head);
+
+    const form = makeEl("form", "sheet-form");
+
+    form.noValidate = true;
+
+    const inputs = {};
+
+    cfg.fields.forEach(f => {
+
+        const wrap = makeEl("div", "sheet-field");
+
+        wrap.appendChild(makeEl("label", "sheet-label", f.label));
+
+        let input;
+
+        if (f.type === "select") {
+
+            input = makeEl("select", "field");
+
+            f.options.forEach(o => {
+
+                const option = makeEl("option", "", o.label);
+
+                option.value = o.value;
+
+                input.appendChild(option);
+
+            });
+
+            if (f.value !== undefined && f.value !== null) {
+                input.value = f.value;
+            }
+
+        } else {
+
+            input = makeEl("input", "field");
+
+            input.type = f.type || "text";
+
+            if (f.type === "number") {
+
+                input.inputMode = "decimal";
+
+                input.step = "any";
+
+            }
+
+            if (f.max) input.max = f.max;
+
+            if (f.maxLength) input.maxLength = f.maxLength;
+
+            input.placeholder = f.placeholder || "";
+
+            input.value = f.value === undefined || f.value === null
+                ? ""
+                : f.value;
+
+        }
+
+        inputs[f.key] = input;
+
+        wrap.appendChild(input);
+
+        form.appendChild(wrap);
+
+    });
+
+    const actions = makeEl("div", "entry-actions");
+
+    const submit = makeEl("button", "primary-btn", cfg.submitLabel || "Save");
+
+    submit.type = "submit";
+
+    actions.appendChild(submit);
+
+    if (cfg.onDelete) {
+
+        const del = makeEl("button", "ghost-btn danger-btn", "Burahin");
+
+        del.type = "button";
+
+        del.addEventListener("click", () => {
+
+            if (cfg.onDelete() !== false) closeSheet();
+
+        });
+
+        actions.appendChild(del);
+
+    }
+
+    form.appendChild(actions);
+
+    if (cfg.note) form.appendChild(makeEl("p", "li-note", cfg.note));
+
+    form.addEventListener("submit", event => {
+
+        event.preventDefault();
+
+        const values = {};
+
+        Object.keys(inputs).forEach(key => {
+            values[key] = inputs[key].value;
+        });
+
+        if (cfg.onSubmit(values) !== false) closeSheet();
+
+    });
+
+    box.appendChild(form);
+
+    sheetBackdrop.addEventListener("click", event => {
+
+        if (event.target === sheetBackdrop) closeSheet();
+
+    });
+
+    document.body.appendChild(sheetBackdrop);
+
+    activeSheet = sheetBackdrop;
+
+}
+
+document.addEventListener("keydown", event => {
+
+    if (event.key === "Escape") closeSheet();
+
+});
+
+
+// ---------- Panels ----------
+
+function txTemplate() {
+
+    return `
+        <section class="work-stats money-stats">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">MONEY MANAGER</p>
+                    <h2>Transactions</h2>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <div class="calendar-header">
+                    <button type="button" data-el="prevMonth">‹</button>
+                    <h3 data-el="monthLabel">Month Year</h3>
+                    <button type="button" data-el="nextMonth">›</button>
+                </div>
+
+                <div class="stats-top">
+                    <div>
+                        <small>NET NGAYONG BUWAN</small>
+                        <h3 data-el="net">₱0</h3>
+                        <p data-el="netSub">Kita ₱0 · Gastos ₱0</p>
+                    </div>
+                    <div class="stats-icon">₱</div>
+                </div>
+
+                <p class="cat-title">SAAN NAPUPUNTA ANG PERA</p>
+
+                <div class="cat-list" data-el="breakdown"></div>
+            </div>
+        </section>
+
+        <section class="calendar-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">TALA</p>
+                    <h2 data-el="entryTitle">Add Transaction</h2>
+                </div>
+            </div>
+
+            <div class="calendar-card">
+                <div class="entry flush">
+                    <div class="toggle-row">
+                        <button type="button" class="toggle-btn exp-btn" data-el="btnExpense">− Gastos</button>
+                        <button type="button" class="toggle-btn inc-btn" data-el="btnIncome">+ Kita</button>
+                    </div>
+
+                    <input class="field" type="number" data-el="amount"
+                        inputmode="decimal" min="0" step="any"
+                        placeholder="Halaga (₱)">
+
+                    <select class="field" data-el="category"></select>
+
+                    <select class="field" data-el="wallet"></select>
+
+                    <input class="field" type="date" data-el="date">
+
+                    <input class="field" type="text" data-el="note"
+                        maxlength="60" placeholder="Note (optional)">
+
+                    <div class="entry-actions">
+                        <button type="button" class="primary-btn" data-el="save">Save</button>
+                        <button type="button" class="ghost-btn" data-el="cancel">Clear</button>
+                    </div>
+
+                    <button type="button" class="ghost-btn danger-btn wide-btn"
+                        data-el="remove" style="display:none">Burahin ang record</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">BUWANANG LIMIT</p>
+                    <h2>Budget</h2>
+                </div>
+                <button type="button" class="chip-btn" data-el="addBudget">＋ Budget</button>
+            </div>
+
+            <div class="stats-card">
+                <div class="budget-list" data-el="budgets"></div>
+            </div>
+        </section>
+
+        <section class="calendar-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">THIS MONTH</p>
+                    <h2>History</h2>
+                </div>
+                <span class="item-count" data-el="count">0 RECORDS</span>
+            </div>
+
+            <div class="chip-row" data-el="filters"></div>
+
+            <div class="work-list" data-el="list"></div>
+        </section>
+    `;
+
+}
+
+function balanceTemplate() {
+
+    return `
+        <section class="work-stats money-stats">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">MONEY MANAGER</p>
+                    <h2>Balance</h2>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stats-top">
+                    <div>
+                        <small>KABUUANG BALANCE</small>
+                        <h3 data-el="total">₱0</h3>
+                        <p data-el="totalSub"></p>
+                    </div>
+                    <div class="stats-icon">₱</div>
+                </div>
+
+                <div class="weekly-chart" data-el="flow"></div>
+
+                <div class="flow-legend">
+                    <span><i class="lg-in"></i> Kita</span>
+                    <span><i class="lg-out"></i> Gastos</span>
+                </div>
+
+                <div class="stats-bottom">
+                    <span>Huling 7 araw</span>
+                    <strong data-el="flowSum">₱0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="calendar-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">MGA WALLET</p>
+                    <h2>Wallets</h2>
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button type="button" class="primary-btn" data-el="addWallet">＋ Wallet</button>
+                <button type="button" class="ghost-btn" data-el="transfer">⇄ Transfer</button>
+            </div>
+
+            <div class="work-list" data-el="wallets"></div>
+        </section>
+    `;
+
+}
+
+const txPanel = makeEl("div", "panel");
+
+txPanel.dataset.panel = "transactions";
+
+txPanel.innerHTML = txTemplate();
+
+panelsHost.appendChild(txPanel);
+
+const tEl = name => txPanel.querySelector(`[data-el="${name}"]`);
+
+const balPanel = makeEl("div", "panel");
+
+balPanel.dataset.panel = "balance";
+
+balPanel.innerHTML = balanceTemplate();
+
+panelsHost.appendChild(balPanel);
+
+const bEl = name => balPanel.querySelector(`[data-el="${name}"]`);
+
+let moneyMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let txFilter = "all";
+let draftType = "expense";
+let editingTx = null;
+
+
+// ---------- Dual bar chart (kita vs gastos) ----------
+// days: [{ key, name, inc, exp }]
+
+function renderDualBars(container, days, activeKey, onPick) {
+
+    container.innerHTML = "";
+
+    const max = Math.max(0, ...days.map(d => Math.max(d.inc, d.exp)));
+
+    days.forEach(day => {
+
+        const column = makeEl("div", "chart-column");
+
+        if (day.key === activeKey) column.classList.add("active");
+
+        const dual = makeEl("div", "dual");
+
+        [["inc", day.inc], ["exp", day.exp]].forEach(([kind, value]) => {
+
+            const track = makeEl("div", "chart-track");
+
+            const fill = makeEl("div", "chart-fill " + kind);
+
+            fill.style.height = value > 0 && max > 0
+                ? Math.max(8, Math.round((value / max) * 100)) + "%"
+                : "0%";
+
+            track.appendChild(fill);
+
+            dual.appendChild(track);
+
+        });
+
+        column.appendChild(dual);
+
+        column.appendChild(makeEl("small", "", day.name));
+
+        if (onPick && day.key <= today) {
+
+            column.style.cursor = "pointer";
+
+            column.addEventListener("click", () => onPick(day.key));
+
+        } else if (day.key > today) {
+
+            column.style.opacity = "0.45";
+
+        }
+
+        container.appendChild(column);
+
+    });
+
+}
+
+function lastDays(count) {
+
+    const now = new Date();
+
+    const days = [];
+
+    for (let i = count - 1; i >= 0; i--) {
+
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+
+        const key = getLocalDate(d);
+
+        const s = daySums(key);
+
+        days.push({
+            key,
+            name: d.toLocaleDateString("en-US", { weekday: "short" }),
+            inc: s.income,
+            exp: s.expense
+        });
+
+    }
+
+    return days;
+
+}
+
+
+// ---------- Transactions: summary ----------
+
+function renderTxSummary() {
+
+    const key = monthKeyOf(moneyMonth);
+
+    tEl("monthLabel").textContent = moneyMonth.toLocaleDateString(
+        "en-US",
+        { month: "long", year: "numeric" }
+    );
+
+    const list = txOfMonth(key);
+
+    const s = sumTx(list);
+
+    const net = round2(s.income - s.expense);
+
+    const netEl = tEl("net");
+
+    netEl.textContent = moneySigned(net);
+
+    netEl.className = net > 0 ? "pos" : net < 0 ? "neg" : "";
+
+    tEl("netSub").textContent =
+        `Kita ${money(s.income)} · Gastos ${money(s.expense)}`;
+
+    const box = tEl("breakdown");
+
+    box.innerHTML = "";
+
+    const byCategory = {};
+
+    list.forEach(t => {
+
+        if (t.type === "expense") {
+            byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+        }
+
+    });
+
+    const rows = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+
+    if (rows.length === 0) {
+
+        box.appendChild(makeEl(
+            "p",
+            "cat-empty",
+            "Wala pang gastos ngayong buwan."
+        ));
+
+        return;
+    }
+
+    rows.forEach(([category, amount]) => {
+
+        const pct = s.expense > 0
+            ? Math.round((amount / s.expense) * 100)
+            : 0;
+
+        const row = makeEl("div", "cat-row");
+
+        const head = makeEl("div", "cat-head");
+
+        head.appendChild(makeEl(
+            "span",
+            "cat-name",
+            `${CATEGORY_ICONS[category] || "✦"} ${category}`
+        ));
+
+        head.appendChild(makeEl(
+            "span",
+            "cat-amt",
+            `${money(amount)} · ${pct}%`
+        ));
+
+        const track = makeEl("div", "cat-track");
+
+        const fill = makeEl("div", "cat-fill");
+
+        fill.style.width = pct + "%";
+
+        track.appendChild(fill);
+
+        row.appendChild(head);
+
+        row.appendChild(track);
+
+        box.appendChild(row);
+
+    });
+
+}
+
+
+// ---------- Transactions: form ----------
+
+function fillSelect(select, options) {
+
+    const previous = select.value;
+
+    select.innerHTML = "";
+
+    options.forEach(o => {
+
+        const option = makeEl("option", "", o.label);
+
+        option.value = o.value;
+
+        select.appendChild(option);
+
+    });
+
+    if (options.some(o => o.value === previous)) select.value = previous;
+
+}
+
+function populateTxForm() {
+
+    const categories = draftType === "income"
+        ? INCOME_CATEGORIES
+        : EXPENSE_CATEGORIES;
+
+    fillSelect(
+        tEl("category"),
+        categories.map(c => ({
+            value: c,
+            label: `${CATEGORY_ICONS[c] || "✦"} ${c}`
+        }))
+    );
+
+    fillSelect(
+        tEl("wallet"),
+        wallets.map(w => ({ value: w.id, label: "👛 " + w.name }))
+    );
+
+}
+
+function setDraftType(type) {
+
+    draftType = type;
+
+    tEl("btnExpense").classList.toggle("on", type === "expense");
+
+    tEl("btnIncome").classList.toggle("on", type === "income");
+
+    populateTxForm();
+
+}
+
+function resetTxForm() {
+
+    editingTx = null;
+
+    tEl("amount").value = "";
+
+    tEl("note").value = "";
+
+    tEl("date").max = today;
+
+    tEl("date").value = today;
+
+    tEl("entryTitle").textContent = "Add Transaction";
+
+    tEl("save").textContent = "Save";
+
+    tEl("cancel").textContent = "Clear";
+
+    tEl("remove").style.display = "none";
+
+    setDraftType(draftType);
+
+}
+
+function loadTxIntoForm(t) {
+
+    editingTx = t.id;
+
+    setDraftType(t.type);
+
+    tEl("amount").value = t.amount;
+
+    tEl("category").value = t.category;
+
+    tEl("wallet").value = t.wallet;
+
+    tEl("date").max = today;
+
+    tEl("date").value = t.date;
+
+    tEl("note").value = t.note || "";
+
+    tEl("entryTitle").textContent = "Edit Transaction";
+
+    tEl("save").textContent = "Update";
+
+    tEl("cancel").textContent = "Cancel";
+
+    tEl("remove").style.display = "";
+
+    tEl("amount").scrollIntoView({ behavior: "smooth", block: "center" });
+
+}
+
+function saveTx() {
+
+    const amount = round2(Number(tEl("amount").value));
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+
+        showToast("Ilagay ang halaga");
+
+        return;
+    }
+
+    const date = tEl("date").value;
+
+    if (!isDateKey(date)) {
+
+        showToast("Pumili ng petsa");
+
+        return;
+    }
+
+    if (date > today) {
+
+        showToast("Hindi pwede ang petsang hindi pa dumarating");
+
+        return;
+    }
+
+    const walletId = tEl("wallet").value;
+
+    if (!walletById(walletId)) {
+
+        showToast("Pumili ng wallet");
+
+        return;
+    }
+
+    const record = {
+        id: editingTx || genId(),
+        type: draftType,
+        amount,
+        category: tEl("category").value,
+        wallet: walletId,
+        date,
+        note: tEl("note").value.trim()
+    };
+
+    const idx = editingTx
+        ? transactions.findIndex(t => t.id === editingTx)
+        : -1;
+
+    if (idx >= 0) {
+
+        const old = transactions[idx];
+
+        // Manatiling naka-link sa Construction Work kung galing doon.
+        if (old.source) {
+            record.source = old.source;
+            record.workDate = old.workDate;
+        }
+
+        transactions[idx] = record;
+
+    } else {
+
+        transactions.push(record);
+
+    }
+
+    saveTransactions();
+
+    const warning = record.type === "expense"
+        ? budgetWarning(record.category, date.slice(0, 7))
+        : "";
+
+    const saved = parseDate(date);
+
+    moneyMonth = new Date(saved.getFullYear(), saved.getMonth(), 1);
+
+    resetTxForm();
+
+    renderMoney();
+
+    renderRecords();
+
+    showToast(warning || "Na-save ✓");
+
+}
+
+function removeEditingTx() {
+
+    if (!editingTx) return;
+
+    if (!confirm("Burahin ang record na ito?")) return;
+
+    transactions = transactions.filter(t => t.id !== editingTx);
+
+    saveTransactions();
+
+    resetTxForm();
+
+    renderMoney();
+
+    renderRecords();
+
+    showToast("Na-burahin ang record");
+
+}
+
+
+// ---------- Transactions: budgets ----------
+
+function renderBudgets() {
+
+    const box = tEl("budgets");
+
+    box.innerHTML = "";
+
+    const key = monthKeyOf(moneyMonth);
+
+    const items = Object.keys(budgets)
+        .filter(category => Number(budgets[category]) > 0)
+        .map(category => {
+
+            const limit = Number(budgets[category]);
+
+            const spent = spentIn(category, key);
+
+            return { category, limit, spent, ratio: spent / limit };
+
+        })
+        .sort((a, b) => b.ratio - a.ratio);
+
+    if (items.length === 0) {
+
+        box.appendChild(makeEl(
+            "p",
+            "cat-empty",
+            "Wala pang budget. Pindutin ang ＋ Budget para magtakda ng " +
+            "buwanang limit sa isang category."
+        ));
+
+        return;
+    }
+
+    items.forEach(item => {
+
+        const state = item.ratio > 1
+            ? "over"
+            : item.ratio >= 0.8
+                ? "warn"
+                : "ok";
+
+        const row = makeEl("button", "budget-row " + state);
+
+        row.type = "button";
+
+        const head = makeEl("div", "cat-head");
+
+        head.appendChild(makeEl(
+            "span",
+            "cat-name",
+            `${CATEGORY_ICONS[item.category] || "✦"} ${item.category}`
+        ));
+
+        head.appendChild(makeEl(
+            "span",
+            "cat-amt",
+            `${money(item.spent)} / ${money(item.limit)}`
+        ));
+
+        const track = makeEl("div", "cat-track");
+
+        const fill = makeEl("div", "cat-fill");
+
+        fill.style.width = Math.min(100, Math.round(item.ratio * 100)) + "%";
+
+        track.appendChild(fill);
+
+        row.appendChild(head);
+
+        row.appendChild(track);
+
+        row.appendChild(makeEl(
+            "p",
+            "budget-foot",
+            item.ratio > 1
+                ? `Lampas ng ${money(item.spent - item.limit)}`
+                : `Natitira ${money(item.limit - item.spent)}`
+        ));
+
+        row.addEventListener("click", () => openBudgetSheet(item.category));
+
+        box.appendChild(row);
+
+    });
+
+}
+
+function openBudgetSheet(category) {
+
+    const selected = category || EXPENSE_CATEGORIES[0];
+
+    openSheet({
+        title: "Budget",
+        submitLabel: "Save",
+        fields: [
+            {
+                key: "category",
+                label: "Category",
+                type: "select",
+                options: EXPENSE_CATEGORIES.map(c => ({
+                    value: c,
+                    label: `${CATEGORY_ICONS[c] || "✦"} ${c}`
+                })),
+                value: selected
+            },
+            {
+                key: "limit",
+                label: "Limit kada buwan (₱)",
+                type: "number",
+                value: budgets[selected] || "",
+                placeholder: "Hal. 3000"
+            }
+        ],
+        note: "Blangko o 0 ang limit = tatanggalin ang budget ng category na iyon.",
+        onSubmit(values) {
+
+            const limit = round2(Number(values.limit));
+
+            if (limit > 0) {
+
+                budgets[values.category] = limit;
+
+            } else {
+
+                delete budgets[values.category];
+
+            }
+
+            saveBudgets();
+
+            renderBudgets();
+
+            showToast("Na-save ang budget ✓");
+
+        },
+        onDelete: category && budgets[category] > 0
+            ? () => {
+
+                delete budgets[category];
+
+                saveBudgets();
+
+                renderBudgets();
+
+                showToast("Na-tanggal ang budget");
+
+            }
+            : null
+    });
+
+}
+
+
+// ---------- Transactions: history list ----------
+
+function buildTxRow(t) {
+
+    const row = makeEl("button", "work-row tx-row");
+
+    row.type = "button";
+
+    row.appendChild(makeEl(
+        "span",
+        "tx-icon",
+        t.type === "transfer" ? "⇄" : (CATEGORY_ICONS[t.category] || "✦")
+    ));
+
+    const main = makeEl("div", "row-main");
+
+    main.appendChild(makeEl(
+        "span",
+        "row-date",
+        t.type === "transfer" ? "Transfer" : t.category
+    ));
+
+    let sub = t.type === "transfer"
+        ? `${walletName(t.wallet)} → ${walletName(t.toWallet)}`
+        : walletName(t.wallet);
+
+    if (t.note) sub += " · " + t.note;
+
+    main.appendChild(makeEl("span", "row-site", sub));
+
+    row.appendChild(main);
+
+    const sign = t.type === "income" ? "+" : t.type === "expense" ? "−" : "";
+
+    row.appendChild(makeEl(
+        "span",
+        "row-pay" +
+            (t.type === "expense" ? " is-exp" : t.type === "transfer" ? " is-off" : ""),
+        sign + money(t.amount)
+    ));
+
+    row.addEventListener("click", () => {
+
+        if (t.type === "transfer") openTransferSheet(t);
+
+        else loadTxIntoForm(t);
+
+    });
+
+    return row;
+
+}
+
+function renderTxList() {
+
+    const key = monthKeyOf(moneyMonth);
+
+    const list = tEl("list");
+
+    list.innerHTML = "";
+
+    const rows = transactions
+        .map((t, i) => ({ t, i }))
+        .filter(({ t }) =>
+            t.date.startsWith(key) &&
+            (txFilter === "all" || t.type === txFilter)
+        )
+        .sort((a, b) =>
+            a.t.date < b.t.date ? 1 : a.t.date > b.t.date ? -1 : b.i - a.i
+        );
+
+    tEl("count").textContent =
+        `${rows.length} ${rows.length === 1 ? "RECORD" : "RECORDS"}`;
+
+    if (rows.length === 0) {
+
+        list.appendChild(makeEl(
+            "div",
+            "work-empty",
+            "Wala pang transactions sa buwan na ito."
+        ));
+
+        return;
+    }
+
+    let lastDate = "";
+
+    rows.forEach(({ t }) => {
+
+        if (t.date !== lastDate) {
+
+            lastDate = t.date;
+
+            list.appendChild(makeEl(
+                "p",
+                "tx-day",
+                parseDate(t.date).toLocaleDateString(
+                    "en-US",
+                    { weekday: "short", month: "short", day: "numeric" }
+                )
+            ));
+
+        }
+
+        list.appendChild(buildTxRow(t));
+
+    });
+
+}
+
+function buildFilters() {
+
+    const box = tEl("filters");
+
+    [
+        ["all", "Lahat"],
+        ["income", "Kita"],
+        ["expense", "Gastos"],
+        ["transfer", "Transfer"]
+    ].forEach(([value, label]) => {
+
+        const chip = makeEl("button", "chip", label);
+
+        chip.type = "button";
+
+        chip.dataset.filter = value;
+
+        if (value === txFilter) chip.classList.add("active");
+
+        chip.addEventListener("click", () => {
+
+            txFilter = value;
+
+            box.querySelectorAll(".chip").forEach(c => {
+                c.classList.toggle("active", c.dataset.filter === value);
+            });
+
+            renderTxList();
+
+        });
+
+        box.appendChild(chip);
+
+    });
+
+}
+
+
+// ---------- Balance ----------
+
+function renderBalance() {
+
+    const total = totalBalance();
+
+    const totalEl = bEl("total");
+
+    totalEl.textContent = money(total);
+
+    totalEl.className = total < 0 ? "neg" : "";
+
+    const s = sumTx(txOfMonth(monthKeyOf(new Date())));
+
+    bEl("totalSub").textContent =
+        `Ngayong buwan: Kita ${money(s.income)} · Gastos ${money(s.expense)}`;
+
+    const days = lastDays(7);
+
+    renderDualBars(bEl("flow"), days, null, null);
+
+    const weekIn = round2(days.reduce((sum, d) => sum + d.inc, 0));
+
+    const weekOut = round2(days.reduce((sum, d) => sum + d.exp, 0));
+
+    bEl("flowSum").textContent = `+${money(weekIn)} · −${money(weekOut)}`;
+
+    const box = bEl("wallets");
+
+    box.innerHTML = "";
+
+    const key = monthKeyOf(new Date());
+
+    wallets.forEach(w => {
+
+        const balance = walletBalance(w.id);
+
+        const flow = walletFlow(w.id, key);
+
+        const row = makeEl("button", "work-row wallet-row");
+
+        row.type = "button";
+
+        row.appendChild(makeEl("span", "tx-icon", "👛"));
+
+        const main = makeEl("div", "row-main");
+
+        main.appendChild(makeEl("span", "row-date", w.name));
+
+        main.appendChild(makeEl(
+            "span",
+            "row-site",
+            `Pumasok ${money(flow.inflow)} · Lumabas ${money(flow.outflow)}`
+        ));
+
+        row.appendChild(main);
+
+        row.appendChild(makeEl(
+            "span",
+            "row-pay" + (balance < 0 ? " is-exp" : ""),
+            money(balance)
+        ));
+
+        row.addEventListener("click", () => openWalletSheet(w));
+
+        box.appendChild(row);
+
+    });
+
+}
+
+function openWalletSheet(existing) {
+
+    const w = existing || null;
+
+    openSheet({
+        title: w ? "Edit Wallet" : "Bagong Wallet",
+        submitLabel: "Save",
+        fields: [
+            {
+                key: "name",
+                label: "Pangalan",
+                type: "text",
+                value: w ? w.name : "",
+                placeholder: "Hal. GCash, Bank, Ipon",
+                maxLength: 24
+            },
+            {
+                key: "opening",
+                label: "Panimulang balance (₱)",
+                type: "number",
+                value: w ? w.opening : "",
+                placeholder: "0"
+            }
+        ],
+        note: "Ang panimulang balance ay ang laman ng wallet bago ka " +
+            "nagsimulang mag-record dito.",
+        onSubmit(values) {
+
+            const name = values.name.trim();
+
+            if (!name) {
+
+                showToast("Ilagay ang pangalan ng wallet");
+
+                return false;
+            }
+
+            const duplicate = wallets.some(x =>
+                x.id !== (w && w.id) &&
+                x.name.toLowerCase() === name.toLowerCase()
+            );
+
+            if (duplicate) {
+
+                showToast("May wallet na may ganyang pangalan");
+
+                return false;
+            }
+
+            const opening = round2(Number(values.opening) || 0);
+
+            if (w) {
+
+                w.name = name;
+
+                w.opening = opening;
+
+            } else {
+
+                wallets.push({ id: genId(), name, opening });
+
+            }
+
+            saveWallets();
+
+            renderMoney();
+
+            renderRecords();
+
+            showToast("Na-save ang wallet ✓");
+
+        },
+        onDelete: w
+            ? () => {
+
+                if (wallets.length <= 1) {
+
+                    showToast("Kailangan ng kahit isang wallet");
+
+                    return false;
+                }
+
+                if (transactions.some(t => t.wallet === w.id || t.toWallet === w.id)) {
+
+                    showToast("May transactions pa ang wallet na ito");
+
+                    return false;
+                }
+
+                if (!confirm(`Burahin ang wallet na "${w.name}"?`)) return false;
+
+                wallets = wallets.filter(x => x.id !== w.id);
+
+                if (settings.workWallet === w.id) {
+
+                    settings.workWallet = "";
+
+                    saveSettings();
+
+                }
+
+                saveWallets();
+
+                renderMoney();
+
+                showToast("Na-burahin ang wallet");
+
+            }
+            : null
+    });
+
+}
+
+function openTransferSheet(existing) {
+
+    if (wallets.length < 2) {
+
+        showToast("Kailangan ng dalawang wallet para mag-transfer");
+
+        return;
+    }
+
+    const t = existing || null;
+
+    const options = wallets.map(w => ({ value: w.id, label: w.name }));
+
+    openSheet({
+        title: t ? "Edit Transfer" : "Transfer",
+        submitLabel: "Save",
+        fields: [
+            {
+                key: "from",
+                label: "Mula sa",
+                type: "select",
+                options,
+                value: t ? t.wallet : options[0].value
+            },
+            {
+                key: "to",
+                label: "Papunta sa",
+                type: "select",
+                options,
+                value: t ? t.toWallet : options[1].value
+            },
+            {
+                key: "amount",
+                label: "Halaga (₱)",
+                type: "number",
+                value: t ? t.amount : "",
+                placeholder: "0"
+            },
+            {
+                key: "date",
+                label: "Petsa",
+                type: "date",
+                value: t ? t.date : today,
+                max: today
+            },
+            {
+                key: "note",
+                label: "Note (optional)",
+                type: "text",
+                value: t ? (t.note || "") : "",
+                maxLength: 60
+            }
+        ],
+        onSubmit(values) {
+
+            const amount = round2(Number(values.amount));
+
+            if (!(amount > 0)) {
+
+                showToast("Ilagay ang halaga");
+
+                return false;
+            }
+
+            if (values.from === values.to) {
+
+                showToast("Magkaibang wallet ang piliin");
+
+                return false;
+            }
+
+            if (!isDateKey(values.date) || values.date > today) {
+
+                showToast("Mali ang petsa");
+
+                return false;
+            }
+
+            const record = {
+                id: t ? t.id : genId(),
+                type: "transfer",
+                amount,
+                category: "Transfer",
+                wallet: values.from,
+                toWallet: values.to,
+                date: values.date,
+                note: values.note.trim()
+            };
+
+            const idx = t
+                ? transactions.findIndex(x => x.id === t.id)
+                : -1;
+
+            if (idx >= 0) transactions[idx] = record;
+
+            else transactions.push(record);
+
+            saveTransactions();
+
+            renderMoney();
+
+            renderRecords();
+
+            showToast("Na-transfer ✓");
+
+        },
+        onDelete: t
+            ? () => {
+
+                if (!confirm("Burahin ang transfer na ito?")) return false;
+
+                transactions = transactions.filter(x => x.id !== t.id);
+
+                saveTransactions();
+
+                renderMoney();
+
+                renderRecords();
+
+                showToast("Na-burahin ang transfer");
+
+            }
+            : null
+    });
+
+}
+
+
+// ---------- Render + events ----------
+
+function renderMoney() {
+
+    renderTxSummary();
+
+    populateTxForm();
+
+    renderBudgets();
+
+    renderTxList();
+
+    renderBalance();
+
+}
+
+tEl("btnExpense").addEventListener("click", () => setDraftType("expense"));
+
+tEl("btnIncome").addEventListener("click", () => setDraftType("income"));
+
+tEl("save").addEventListener("click", saveTx);
+
+tEl("cancel").addEventListener("click", resetTxForm);
+
+tEl("remove").addEventListener("click", removeEditingTx);
+
+["amount", "note"].forEach(name => {
+
+    tEl(name).addEventListener("keydown", event => {
+
+        if (event.key === "Enter") {
+
+            event.preventDefault();
+
+            saveTx();
+
+        }
+
+    });
+
+});
+
+tEl("addBudget").addEventListener("click", () => openBudgetSheet());
+
+tEl("prevMonth").addEventListener("click", () => {
+
+    moneyMonth = new Date(moneyMonth.getFullYear(), moneyMonth.getMonth() - 1, 1);
+
+    renderTxSummary();
+
+    renderBudgets();
+
+    renderTxList();
+
+});
+
+tEl("nextMonth").addEventListener("click", () => {
+
+    moneyMonth = new Date(moneyMonth.getFullYear(), moneyMonth.getMonth() + 1, 1);
+
+    renderTxSummary();
+
+    renderBudgets();
+
+    renderTxList();
+
+});
+
+bEl("addWallet").addEventListener("click", () => openWalletSheet());
+
+bEl("transfer").addEventListener("click", () => openTransferSheet());
+
+buildFilters();
+
+resetTxForm();
+
+renderMoney();
+
+
+
+// ========================================
 // ALL RECORDS
 // ========================================
 
@@ -1393,10 +3217,10 @@ function recordsTemplate() {
                 <div class="calendar-grid" data-el="calendarGrid"></div>
 
                 <p class="rec-note">
-                    Tatlong tuldok bawat araw, kaliwa → kanan:
-                    Habits · Vitamins · Work.<br>
+                    Apat na tuldok bawat araw, kaliwa → kanan:
+                    Habits · Vitamins · Work · Money.<br>
                     Green = complete · Pula = partial · Dilaw = nagtrabaho ·
-                    Abo = off.
+                    Abo = off · Asul = may money record.
                 </p>
 
                 <div class="selected-day" data-el="detail"></div>
@@ -1442,6 +3266,17 @@ function recordsTemplate() {
                     <span class="rec-sub" data-el="kSub"></span>
                 </div>
                 <div class="weekly-chart mini" data-el="kChart"></div>
+            </div>
+
+            <div class="stats-card rec-card rec-money">
+                <div class="rec-top">
+                    <div>
+                        <small>MONEY</small>
+                        <h3 data-el="mVal">₱0</h3>
+                    </div>
+                    <span class="rec-sub" data-el="mSub"></span>
+                </div>
+                <div class="weekly-chart mini" data-el="mChart"></div>
             </div>
         </section>
     `;
@@ -1504,6 +3339,8 @@ function renderRecordsCalendar() {
     const habitsHistory = habitsTracker.getHistory();
     const vitaminsHistory = vitaminsTracker.getHistory();
 
+    const moneyDates = new Set(transactions.map(t => t.date));
+
     for (let i = 0; i < firstDay; i++) {
 
         grid.appendChild(makeEl("div", "calendar-day empty"));
@@ -1525,7 +3362,8 @@ function renderRecordsCalendar() {
         [
             checklistDot(habitsHistory[dateKey]),
             checklistDot(vitaminsHistory[dateKey]),
-            workDot(workLog[dateKey])
+            workDot(workLog[dateKey]),
+            moneyDates.has(dateKey) ? "money" : "dim"
         ].forEach(kind => {
 
             dots.appendChild(makeEl("i", "dot " + kind));
@@ -1598,6 +3436,19 @@ function renderRecordsDetail() {
     }
 
     box.appendChild(makeEl("p", "", "Work: " + workText));
+
+    const moneyCount = transactions.filter(t => t.date === recordsDate).length;
+
+    const moneyDay = daySums(recordsDate);
+
+    box.appendChild(makeEl(
+        "p",
+        "",
+        "Money: " + (moneyCount
+            ? `Kita ${money(moneyDay.income)} · Gastos ${money(moneyDay.expense)} ` +
+              `(${moneyCount} ${moneyCount === 1 ? "record" : "records"})`
+            : "No record")
+    ));
 
 }
 
@@ -1713,6 +3564,37 @@ function renderRecordsStats() {
 
     renderBars(rEl("kChart"), workBars, recordsDate, pick);
 
+    const moneyDays = dates.map(date => {
+
+        const key = getLocalDate(date);
+
+        const sums = daySums(key);
+
+        return {
+            key,
+            name: date.toLocaleDateString("en-US", { weekday: "short" }),
+            inc: sums.income,
+            exp: sums.expense
+        };
+
+    });
+
+    const moneyIn = round2(moneyDays.reduce((sum, d) => sum + d.inc, 0));
+
+    const moneyOut = round2(moneyDays.reduce((sum, d) => sum + d.exp, 0));
+
+    rEl("mVal").textContent = moneySigned(moneyIn - moneyOut);
+
+    rEl("mSub").textContent = `Kita ${money(moneyIn)} · Gastos ${money(moneyOut)}`;
+
+    renderDualBars(rEl("mChart"), moneyDays, recordsDate, key => {
+
+        const picked = parseDate(key);
+
+        pick(key, picked);
+
+    });
+
 }
 
 function renderRecords() {
@@ -1757,32 +3639,321 @@ renderRecords();
 
 
 // ========================================
-// TABS
+// SIDEBAR + SECTIONS
 // ========================================
 
-const tabButtons = Array.from(tabsNav.querySelectorAll(".tab"));
+function pctToday(history) {
+
+    const record = history[today];
+
+    return record && record.total > 0
+        ? Math.round((record.completed / record.total) * 100) + "%"
+        : "—";
+
+}
+
+const SECTIONS = [
+    {
+        id: "habits",
+        title: "My daily task",
+        icon: "✅",
+        group: "TRACKER",
+        summary: () => pctToday(habitsTracker.getHistory())
+    },
+    {
+        id: "work",
+        title: "Construction Work",
+        icon: "🛠",
+        group: "TRACKER",
+        summary: () => {
+
+            const week = workSum(
+                getSunSatDates(new Date()).map(date => getLocalDate(date))
+            );
+
+            return week.days > 0
+                ? `${week.days}d · ${peso(week.pay)}`
+                : "—";
+
+        }
+    },
+    {
+        id: "vitamins",
+        title: "Daily Vitamins",
+        icon: "💊",
+        group: "TRACKER",
+        summary: () => pctToday(vitaminsTracker.getHistory())
+    },
+    {
+        id: "transactions",
+        title: "Transactions",
+        icon: "🧾",
+        group: "MONEY",
+        summary: () => {
+
+            const s = sumTx(txOfMonth(monthKeyOf(new Date())));
+
+            return s.expense > 0 ? "−" + money(s.expense) : "—";
+
+        }
+    },
+    {
+        id: "balance",
+        title: "Balance",
+        icon: "👛",
+        group: "MONEY",
+        summary: () => money(totalBalance())
+    },
+    {
+        id: "records",
+        title: "All Records",
+        icon: "📅",
+        group: "OVERVIEW",
+        summary: () => ""
+    }
+];
+
+// Kung luma pa ang index.html (may lumang tabs), itago ang tabs.
+const oldTabs = document.getElementById("tabs");
+
+if (oldTabs) oldTabs.style.display = "none";
+
+let menuButton = menuBtn;
+let titleEl = sectionTitle;
+
+// Kung wala ang menu bar sa index.html, gumawa nito.
+if (!menuButton || !titleEl) {
+
+    const bar = makeEl("nav", "topbar");
+
+    menuButton = makeEl("button", "menu-btn", "☰");
+
+    menuButton.type = "button";
+
+    menuButton.setAttribute("aria-label", "Open menu");
+
+    titleEl = makeEl("span", "topbar-title", "My daily task");
+
+    bar.appendChild(menuButton);
+
+    bar.appendChild(titleEl);
+
+    panelsHost.parentNode.insertBefore(bar, panelsHost);
+
+}
+
+const sbBackdrop = makeEl("div", "sidebar-backdrop");
+
+const sidebar = makeEl("aside", "sidebar");
+
+sidebar.setAttribute("aria-label", "Sections");
+
+const sbHead = makeEl("div", "sb-head");
+
+const sbBrand = makeEl("div", "sb-brand");
+
+sbBrand.appendChild(makeEl("span", "brand-icon", "L."));
+
+sbBrand.appendChild(makeEl("span", "", "LOCKED IN."));
+
+const sbClose = makeEl("button", "sb-close", "✕");
+
+sbClose.type = "button";
+
+sbClose.setAttribute("aria-label", "Close menu");
+
+sbHead.appendChild(sbBrand);
+
+sbHead.appendChild(sbClose);
+
+sidebar.appendChild(sbHead);
+
+const sbList = makeEl("div", "sb-list");
+
+let lastGroup = "";
+
+SECTIONS.forEach(section => {
+
+    if (section.group !== lastGroup) {
+
+        lastGroup = section.group;
+
+        sbList.appendChild(makeEl("p", "sb-group", section.group));
+
+    }
+
+    const item = makeEl("button", "sb-item");
+
+    item.type = "button";
+
+    item.appendChild(makeEl("span", "sb-icon", section.icon));
+
+    item.appendChild(makeEl("span", "sb-name", section.title));
+
+    const sum = makeEl("span", "sb-sum");
+
+    item.appendChild(sum);
+
+    item.appendChild(makeEl("span", "sb-chev", "›"));
+
+    item.addEventListener("click", () => {
+
+        showSection(section.id);
+
+        closeSidebar();
+
+    });
+
+    section.el = item;
+
+    section.sumEl = sum;
+
+    sbList.appendChild(item);
+
+});
+
+sidebar.appendChild(sbList);
+
+const sbFoot = makeEl("div", "sb-foot");
+
+const sbSettings = makeEl("button", "sb-item sb-settings");
+
+sbSettings.type = "button";
+
+sbSettings.appendChild(makeEl("span", "sb-icon", "⚙"));
+
+sbSettings.appendChild(makeEl("span", "sb-name", "Settings"));
+
+sbSettings.appendChild(makeEl("span", "sb-chev", "›"));
+
+sbSettings.addEventListener("click", () => {
+
+    closeSidebar();
+
+    openSettings();
+
+});
+
+sbFoot.appendChild(sbSettings);
+
+sidebar.appendChild(sbFoot);
+
+document.body.appendChild(sbBackdrop);
+
+document.body.appendChild(sidebar);
+
+function refreshSidebar() {
+
+    SECTIONS.forEach(section => {
+
+        try {
+
+            section.sumEl.textContent = section.summary();
+
+        } catch (error) {
+
+            section.sumEl.textContent = "";
+
+        }
+
+    });
+
+}
+
+function openSidebar() {
+
+    refreshSidebar();
+
+    sidebar.classList.add("open");
+
+    sbBackdrop.classList.add("open");
+
+    document.body.classList.add("no-scroll");
+
+    menuButton.setAttribute("aria-expanded", "true");
+
+}
+
+function closeSidebar() {
+
+    sidebar.classList.remove("open");
+
+    sbBackdrop.classList.remove("open");
+
+    document.body.classList.remove("no-scroll");
+
+    menuButton.setAttribute("aria-expanded", "false");
+
+}
+
+menuButton.addEventListener("click", () => {
+
+    if (sidebar.classList.contains("open")) closeSidebar();
+
+    else openSidebar();
+
+});
+
+sbClose.addEventListener("click", closeSidebar);
+
+sbBackdrop.addEventListener("click", closeSidebar);
+
+document.addEventListener("keydown", event => {
+
+    if (event.key === "Escape") closeSidebar();
+
+});
+
+// I-swipe pakaliwa ang menu para isara.
+let sbTouchX = null;
+
+sidebar.addEventListener("touchstart", event => {
+
+    sbTouchX = event.touches[0].clientX;
+
+}, { passive: true });
+
+sidebar.addEventListener("touchend", event => {
+
+    if (sbTouchX === null) return;
+
+    const dx = event.changedTouches[0].clientX - sbTouchX;
+
+    sbTouchX = null;
+
+    if (dx < -60) closeSidebar();
+
+}, { passive: true });
 
 const panelEls = Array.from(panelsHost.querySelectorAll(".panel"));
 
-function showTab(name) {
+function showSection(name) {
 
-    tabButtons.forEach(button => {
+    const section = SECTIONS.find(s => s.id === name) || SECTIONS[0];
 
-        button.classList.toggle("active", button.dataset.tab === name);
+    SECTIONS.forEach(s => {
+
+        s.el.classList.toggle("active", s === section);
+
+    });
+
+    panelEls.forEach(panelEl => {
+
+        panelEl.classList.toggle("active", panelEl.dataset.panel === section.id);
 
     });
 
-    panelEls.forEach(panel => {
-
-        panel.classList.toggle("active", panel.dataset.panel === name);
-
-    });
+    titleEl.textContent = section.title;
 
     try {
-        localStorage.setItem("lockedInTab", name);
+        localStorage.setItem("lockedInTab", section.id);
     } catch (error) { /* ignore */ }
 
-    if (name === "records") renderRecords();
+    if (section.id === "records") renderRecords();
+
+    if (section.id === "transactions" || section.id === "balance") {
+        renderMoney();
+    }
 
     if (panelsHost.getBoundingClientRect().top < 0) {
 
@@ -1792,19 +3963,9 @@ function showTab(name) {
 
 }
 
-tabButtons.forEach(button => {
+showSection(localStorage.getItem("lockedInTab") || "habits");
 
-    button.addEventListener("click", () => showTab(button.dataset.tab));
-
-});
-
-const savedTab = localStorage.getItem("lockedInTab");
-
-showTab(
-    tabButtons.some(button => button.dataset.tab === savedTab)
-        ? savedTab
-        : "habits"
-);
+refreshSidebar();
 
 
 // ========================================
@@ -2010,6 +4171,8 @@ function renderEverything() {
 
     renderWorkAll();
 
+    renderMoney();
+
     renderRecords();
 
 }
@@ -2097,6 +4260,127 @@ weeklySection.appendChild(makeEl(
 
 refreshWeekButtons();
 
+// --- Money ---
+const moneySettingsSection = makeSection("Money");
+
+moneySettingsSection.appendChild(makeEl(
+    "p",
+    "li-note",
+    "Saan papasok ang sahod kapag nag-save ka sa Construction Work?"
+));
+
+const workWalletSelect = makeEl("select", "li-input");
+
+workWalletSelect.style.marginTop = "8px";
+
+function refreshWorkWalletSelect() {
+
+    workWalletSelect.innerHTML = "";
+
+    [
+        { value: "", label: "Auto (unang wallet)" },
+        { value: "off", label: "Huwag i-record" }
+    ]
+        .concat(wallets.map(w => ({ value: w.id, label: w.name })))
+        .forEach(o => {
+
+            const option = makeEl("option", "", o.label);
+
+            option.value = o.value;
+
+            workWalletSelect.appendChild(option);
+
+        });
+
+    workWalletSelect.value =
+        settings.workWallet === "off" || walletById(settings.workWallet)
+            ? settings.workWallet
+            : "";
+
+}
+
+workWalletSelect.addEventListener("change", () => {
+
+    settings.workWallet = workWalletSelect.value;
+
+    saveSettings();
+
+});
+
+moneySettingsSection.appendChild(workWalletSelect);
+
+const syncOldRow = makeEl("div", "li-row");
+
+syncOldRow.style.marginTop = "10px";
+
+const syncOldButton = makeEl("button", "li-btn", "Isama ang lumang sahod");
+
+syncOldButton.type = "button";
+
+syncOldRow.appendChild(syncOldButton);
+
+moneySettingsSection.appendChild(syncOldRow);
+
+moneySettingsSection.appendChild(makeEl(
+    "p",
+    "li-note",
+    "Ang mga bagong save sa Construction Work ay kusang papasok bilang " +
+    "income. Ang button sa itaas ay magdadagdag ng income para sa mga " +
+    "lumang araw na nai-save mo na dati (isang beses lang bawat araw, " +
+    "walang duplicate)."
+));
+
+syncOldButton.addEventListener("click", () => {
+
+    const walletId = autoWorkWalletId();
+
+    if (!walletId) {
+
+        showToast("Naka-off ang auto-record ng sahod");
+
+        return;
+    }
+
+    const pending = Object.keys(workLog).filter(key => {
+
+        const record = workLog[key];
+
+        return record &&
+            record.worked &&
+            Number(record.pay) > 0 &&
+            !transactions.some(t => t.source === "work" && t.workDate === key);
+
+    });
+
+    if (pending.length === 0) {
+
+        showToast("Wala nang idadagdag");
+
+        return;
+    }
+
+    const total = pending.reduce(
+        (sum, key) => sum + (Number(workLog[key].pay) || 0),
+        0
+    );
+
+    if (!confirm(
+        `Magdadagdag ng ${pending.length} income (${money(total)}) ` +
+        `sa wallet na "${walletName(walletId)}". Tuloy?`
+    )) {
+        return;
+    }
+
+    pending.forEach(key => syncWorkTransaction(key));
+
+    renderMoney();
+
+    renderRecords();
+
+    showToast(`Naidagdag ang ${pending.length} sahod ✓`);
+
+});
+
 // --- Backup ---
 const backupSection = makeSection("Backup");
 
@@ -2123,7 +4407,7 @@ backupSection.appendChild(fileInput);
 backupSection.appendChild(makeEl(
     "p",
     "li-note",
-    "Isasama ang habits, vitamins, construction work, at settings. " +
+    "Isasama ang habits, vitamins, construction work, money, at settings. " +
     "Ang Import ay papalit sa lahat ng data na nasa app ngayon."
 ));
 
@@ -2139,7 +4423,7 @@ exportButton.addEventListener("click", () => {
 
     const backup = {
         app: "locked-in",
-        version: 5,
+        version: 6,
         exportedAt: new Date().toISOString(),
         data
     };
@@ -2246,13 +4530,23 @@ fileInput.addEventListener("change", () => {
         let backup;
 
         try {
-
-            backup = normalizeBackup(JSON.parse(reader.result));
+        
+        backup = normalizeBackup(JSON.parse(reader.result));
 
             // I-validate ang bawat laman
             STORAGE_KEYS.forEach(key => {
 
-                if (backup[key] !== null) JSON.parse(backup[key]);
+                if (backup[key] === null) return;
+
+                if (DATE_KEYS.includes(key)) {
+
+                    if (!isDateKey(backup[key])) throw new Error("Invalid date");
+
+                } else {
+
+                    JSON.parse(backup[key]);
+
+                }
 
             });
 
@@ -2306,14 +4600,17 @@ const dangerRow = makeEl("div", "li-row");
 
 const resetHistoryButton = makeEl("button", "li-btn danger", "Reset history");
 const resetWorkButton = makeEl("button", "li-btn danger", "Reset work log");
+const resetMoneyButton = makeEl("button", "li-btn danger", "Reset money");
 const resetAllButton = makeEl("button", "li-btn danger", "Reset lahat");
 
 resetHistoryButton.type = "button";
 resetWorkButton.type = "button";
+resetMoneyButton.type = "button";
 resetAllButton.type = "button";
 
 dangerRow.appendChild(resetHistoryButton);
 dangerRow.appendChild(resetWorkButton);
+dangerRow.appendChild(resetMoneyButton);
 dangerRow.appendChild(resetAllButton);
 
 dangerSection.appendChild(dangerRow);
@@ -2323,7 +4620,9 @@ dangerSection.appendChild(makeEl(
     "li-note",
     "Reset history: buburahin ang nakaraang araw ng habits at vitamins " +
     "(mananatili ang listahan). Reset work log: buburahin ang lahat ng " +
-    "construction records. Reset lahat: buburahin ang lahat maliban sa settings. " +
+    "construction records (mananatili ang income sa Transactions). " +
+    "Reset money: buburahin ang transactions, wallets, at budgets. " +
+    "Reset lahat: buburahin ang lahat maliban sa settings. " +
     "Mag-Export muna bilang backup!"
 ));
 
@@ -2367,9 +4666,22 @@ resetWorkButton.addEventListener("click", () => {
 
 });
 
+resetMoneyButton.addEventListener("click", () => {
+
+    if (!confirm("Burahin ang LAHAT ng transactions, wallets, at budgets? Hindi na ito mababawi.")) {
+        return;
+    }
+
+    ["lockedInWallets", "lockedInTransactions", "lockedInBudgets"]
+        .forEach(key => localStorage.removeItem(key));
+
+    location.reload();
+
+});
+
 resetAllButton.addEventListener("click", () => {
 
-    if (!confirm("Burahin ang LAHAT ng habits, vitamins, at work records? Hindi na ito mababawi.")) {
+    if (!confirm("Burahin ang LAHAT ng habits, vitamins, work records, at money? Hindi na ito mababawi.")) {
         return;
     }
 
@@ -2388,12 +4700,14 @@ resetAllButton.addEventListener("click", () => {
 panel.appendChild(makeEl(
     "p",
     "li-note",
-    "LOCKED IN. v5 — Discipline today. Freedom tomorrow."
+    "LOCKED IN. v6 — Discipline today. Freedom tomorrow."
 ));
 
 function openSettings() {
 
     nameInput.value = settings.name;
+
+    refreshWorkWalletSelect();
 
     refreshWeekButtons();
 
