@@ -1,6 +1,6 @@
-  // ========================================
-// LOCKED IN. V7
-// Daily Task + Construction + Vitamins
+ // ========================================
+// LOCKED IN. V8
+// Daily Task + Construction (Natanggap/Hindi pa + Gas) + Vitamins
 // + Money Manager + Attendance + All Records + Settings
 // ========================================
 
@@ -106,6 +106,7 @@ let settings = {
     name: "",
     weekMode: "rolling", // "rolling" o "fixed"
     workWallet: "",      // "" = unang wallet, "off" = huwag i-record
+    workGas: true,       // i-record ang gas ng construction bilang gastos
     ...readJSON("lockedInSettings", {})
 };
 
@@ -874,6 +875,7 @@ function workTemplate() {
                         <small data-el="weekRange">THIS WEEK</small>
                         <h3 data-el="weekDays">0 days</h3>
                         <p data-el="weekPay">₱0 sahod</p>
+                        <p class="work-detail" data-el="weekDetail"></p>
                     </div>
                     <div class="stats-icon">🛠</div>
                 </div>
@@ -884,6 +886,10 @@ function workTemplate() {
                     <span data-el="monthLabelStat">This month</span>
                     <strong data-el="monthSummary">0 days · ₱0</strong>
                 </div>
+
+                <p class="work-detail work-detail-month" data-el="monthDetail"></p>
+
+                <div class="pending-box" data-el="pending"></div>
             </div>
         </section>
 
@@ -908,6 +914,7 @@ function workTemplate() {
                     <span><i class="legend-complete"></i> Worked</span>
                     <span><i class="legend-off"></i> Off</span>
                     <span><i class="legend-empty"></i> No record</span>
+                    <span><i class="legend-unpaid"></i> Hindi pa bayad</span>
                 </div>
 
                 <div class="entry">
@@ -926,6 +933,15 @@ function workTemplate() {
                         <input class="field" type="number" data-el="pay"
                             inputmode="decimal" min="0" step="any"
                             placeholder="Sahod (₱)">
+
+                        <input class="field" type="number" data-el="gas"
+                            inputmode="decimal" min="0" step="any"
+                            placeholder="Gas ngayong araw (₱)">
+
+                        <div class="toggle-row paid-row">
+                            <button type="button" class="toggle-btn" data-el="btnPaid">✅ Natanggap na</button>
+                            <button type="button" class="toggle-btn off-btn" data-el="btnUnpaid">⏳ Hindi pa</button>
+                        </div>
                     </div>
 
                     <div class="entry-actions">
@@ -973,6 +989,7 @@ if (
 let workSelected = today;
 let workCalendar = new Date();
 let draftWorked = true;
+let draftPaid = false;
 
 function saveWork() {
 
@@ -984,6 +1001,9 @@ function workSum(dateKeys) {
 
     let days = 0;
     let pay = 0;
+    let gas = 0;
+    let paid = 0;
+    let unpaid = 0;
 
     dateKeys.forEach(key => {
 
@@ -993,13 +1013,34 @@ function workSum(dateKeys) {
 
             days++;
 
-            pay += Number(record.pay) || 0;
+            const amount = Number(record.pay) || 0;
+
+            pay += amount;
+
+            gas += Number(record.gas) || 0;
+
+            if (record.paid === true) paid += amount;
+            else unpaid += amount;
 
         }
 
     });
 
-    return { days, pay };
+    return { days, pay, gas, paid, unpaid };
+
+}
+
+function workDetailText(sum) {
+
+    if (sum.days === 0) return "";
+
+    let text = `Natanggap ${peso(sum.paid)} · Hinihintay ${peso(sum.unpaid)}`;
+
+    if (sum.gas > 0) {
+        text += `\nGas ${peso(sum.gas)} · Net ${peso(sum.pay - sum.gas)}`;
+    }
+
+    return text;
 
 }
 
@@ -1019,6 +1060,10 @@ function refreshToggle() {
 
     wEl("fields").style.display = draftWorked ? "" : "none";
 
+    wEl("btnPaid").classList.toggle("on", draftPaid);
+
+    wEl("btnUnpaid").classList.toggle("on", !draftPaid);
+
 }
 
 function loadDraft() {
@@ -1026,6 +1071,10 @@ function loadDraft() {
     const record = workLog[workSelected];
 
     draftWorked = record ? Boolean(record.worked) : true;
+
+    draftPaid = record ? record.paid === true : false;
+
+    wEl("gas").value = record && record.gas ? record.gas : "";
 
     wEl("site").value = record && record.site ? record.site : "";
 
@@ -1103,6 +1152,8 @@ function renderWorkStats() {
 
     wEl("weekPay").textContent = peso(week.pay) + " sahod";
 
+    wEl("weekDetail").textContent = workDetailText(week);
+
     const month = workSum(monthKeys(anchor));
 
     wEl("monthLabelStat").textContent = anchor.toLocaleDateString(
@@ -1112,6 +1163,59 @@ function renderWorkStats() {
 
     wEl("monthSummary").textContent =
         `${month.days} ${month.days === 1 ? "day" : "days"} · ${peso(month.pay)}`;
+
+    wEl("monthDetail").textContent = workDetailText(month);
+
+    renderWorkPending();
+
+}
+
+// Kabuuang sahod na hinihintay pa (lahat ng buwan)
+function pendingWork() {
+
+    let days = 0;
+    let amount = 0;
+
+    Object.keys(workLog).forEach(key => {
+
+        const record = workLog[key];
+
+        if (
+            record &&
+            record.worked &&
+            record.paid !== true &&
+            Number(record.pay) > 0
+        ) {
+            days++;
+            amount += Number(record.pay) || 0;
+        }
+
+    });
+
+    return { days, amount };
+
+}
+
+function renderWorkPending() {
+
+    const box = wEl("pending");
+
+    const pending = pendingWork();
+
+    box.classList.toggle("clear", pending.days === 0);
+
+    if (Object.keys(workLog).length === 0) {
+
+        box.style.display = "none";
+
+        return;
+    }
+
+    box.style.display = "";
+
+    box.textContent = pending.days === 0
+        ? "✅ Wala ka nang hinihintay na sahod"
+        : `⏳ Hinihintay pa: ${peso(pending.amount)} (${pending.days} ${pending.days === 1 ? "araw" : "araw"})`;
 
 }
 
@@ -1162,6 +1266,10 @@ function renderWorkCalendar() {
         if (record) {
 
             cell.classList.add(record.worked ? "complete" : "off");
+
+            if (record.worked && record.paid !== true && Number(record.pay) > 0) {
+                cell.classList.add("unpaid");
+            }
 
         }
 
@@ -1227,10 +1335,24 @@ function renderWorkRecent() {
 
         row.appendChild(main);
 
+        if (record.worked && Number(record.gas) > 0) {
+
+            main.appendChild(makeEl(
+                "span",
+                "row-site",
+                "Gas " + peso(record.gas)
+            ));
+
+        }
+
+        const payText = record.worked
+            ? peso(record.pay) + (record.paid === true ? " ✅" : " ⏳")
+            : "Off";
+
         row.appendChild(makeEl(
             "span",
             record.worked ? "row-pay" : "row-pay is-off",
-            record.worked ? peso(record.pay) : "Off"
+            payText
         ));
 
         row.addEventListener("click", () => {
@@ -1285,6 +1407,22 @@ wEl("btnOff").addEventListener("click", () => {
 
 });
 
+wEl("btnPaid").addEventListener("click", () => {
+
+    draftPaid = true;
+
+    refreshToggle();
+
+});
+
+wEl("btnUnpaid").addEventListener("click", () => {
+
+    draftPaid = false;
+
+    refreshToggle();
+
+});
+
 wEl("save").addEventListener("click", () => {
 
     let pay = Number(wEl("pay").value);
@@ -1293,10 +1431,18 @@ wEl("save").addEventListener("click", () => {
 
     pay = Math.round(pay * 100) / 100;
 
+    let gas = Number(wEl("gas").value);
+
+    if (!Number.isFinite(gas) || gas < 0) gas = 0;
+
+    gas = Math.round(gas * 100) / 100;
+
     workLog[workSelected] = {
         worked: draftWorked,
         site: draftWorked ? wEl("site").value.trim() : "",
-        pay: draftWorked ? pay : 0
+        pay: draftWorked ? pay : 0,
+        gas: draftWorked ? gas : 0,
+        paid: draftWorked ? draftPaid : false
     };
 
     saveWork();
@@ -1311,7 +1457,11 @@ wEl("save").addEventListener("click", () => {
 
     renderRecords();
 
-    showToast(paidTo ? "Na-save ✓ · pumasok sa " + paidTo : "Na-save ✓");
+    showToast(
+        paidTo
+            ? "Na-save ✓ · pumasok sa " + paidTo
+            : (draftWorked && draftPaid ? "Na-save ✓" : "Na-save ✓ · hinihintay pa ang sahod")
+    );
 
 });
 
@@ -1509,6 +1659,35 @@ transactions = transactions
     )
     .map(t => ({ ...t, amount: Number(t.amount) }));
 
+// v8: ang mga lumang record na may income na sa Transactions ay
+// ituturing na natanggap na; ang iba ay "hindi pa".
+(function migrateWorkPaid() {
+
+    let changed = false;
+
+    Object.keys(workLog).forEach(key => {
+
+        const record = workLog[key];
+
+        if (!record || typeof record !== "object") return;
+
+        if (typeof record.paid !== "boolean") {
+
+            record.paid = Boolean(
+                record.worked &&
+                transactions.some(t => t.source === "work" && t.workDate === key)
+            );
+
+            changed = true;
+
+        }
+
+    });
+
+    if (changed) saveWork();
+
+})();
+
 let budgets = readJSON("lockedInBudgets", {});
 
 if (!budgets || typeof budgets !== "object" || Array.isArray(budgets)) {
@@ -1687,8 +1866,75 @@ function autoWorkWalletId() {
 
 }
 
+// Gas ng araw na iyon → gastos (kategoryang gasoline). Hindi na kailangang
+// hintayin ang sahod, kasi lumalabas na ang pera sa mismong araw.
+function syncWorkGas(dateKey) {
+
+    const record = workLog[dateKey];
+
+    const idx = transactions.findIndex(
+        t => t.source === "workgas" && t.workDate === dateKey
+    );
+
+    const gas = record ? round2(record.gas) : 0;
+
+    if (
+        !record ||
+        !record.worked ||
+        !(gas > 0) ||
+        settings.workGas === false
+    ) {
+
+        if (idx >= 0) {
+
+            transactions.splice(idx, 1);
+
+            saveTransactions();
+
+        }
+
+        return;
+    }
+
+    const walletId = autoWorkWalletId();
+
+    if (!walletId) return;
+
+    const note = record.site ? "Gas · " + record.site : "Gas papunta sa trabaho";
+
+    if (idx >= 0) {
+
+        transactions[idx] = {
+            ...transactions[idx],
+            amount: gas,
+            date: dateKey,
+            note
+        };
+
+    } else {
+
+        transactions.push({
+            id: genId(),
+            type: "expense",
+            amount: gas,
+            category: " gasoline",
+            wallet: walletId,
+            date: dateKey,
+            note,
+            source: "workgas",
+            workDate: dateKey
+        });
+
+    }
+
+    saveTransactions();
+
+}
+
 // Ibinabalik ang pangalan ng wallet kung may na-record/na-update na income.
 function syncWorkTransaction(dateKey) {
+
+    syncWorkGas(dateKey);
 
     const record = workLog[dateKey];
 
@@ -1699,7 +1945,7 @@ function syncWorkTransaction(dateKey) {
     const pay = record ? round2(record.pay) : 0;
 
     // Kapag Off / walang sahod / binura ang record, alisin ang income.
-    if (!record || !record.worked || !(pay > 0)) {
+    if (!record || !record.worked || !(pay > 0) || record.paid !== true) {
 
         if (idx >= 0) {
 
@@ -4845,6 +5091,34 @@ settingsStyle.textContent = `
         background: transparent;
         border: 1px dashed #8a8a98;
     }
+    .work-detail {
+        margin: 4px 0 0;
+        font-size: .78rem;
+        opacity: .75;
+        white-space: pre-line;
+    }
+    .work-detail-month { margin-top: 8px; }
+    .pending-box {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: .85rem;
+        font-weight: 600;
+        background: rgba(255,184,77,.14);
+        border: 1px solid rgba(255,184,77,.35);
+        color: #ffb84d;
+    }
+    .pending-box.clear {
+        background: rgba(69,201,139,.14);
+        border-color: rgba(69,201,139,.35);
+        color: var(--green);
+    }
+    .calendar-day.unpaid { box-shadow: inset 0 0 0 2px #ffb84d; }
+    .legend-unpaid {
+        background: transparent;
+        border: 2px solid #ffb84d;
+    }
+    .paid-row { margin-top: 10px; }
     .att-card { margin-bottom: 12px; }
     .att-card .cat-fill { background: var(--green); }
     .att-dates {
@@ -5179,11 +5453,48 @@ moneySettingsSection.appendChild(syncOldRow);
 moneySettingsSection.appendChild(makeEl(
     "p",
     "li-note",
-    "Ang mga bagong save sa Construction Work ay kusang papasok bilang " +
-    "income. Ang button sa itaas ay magdadagdag ng income para sa mga " +
-    "lumang araw na nai-save mo na dati (isang beses lang bawat araw, " +
-    "walang duplicate)."
+    "Papasok lang bilang income ang sahod kapag minarkahan mong " +
+    "\"Natanggap na\" ang araw. Ang button sa itaas ay magdadagdag ng " +
+    "income para sa mga natanggap nang araw na wala pa sa Transactions " +
+    "(isang beses lang bawat araw, walang duplicate)."
 ));
+
+const workGasSelect = makeEl("select", "li-input");
+
+workGasSelect.style.marginTop = "12px";
+
+[
+    ["on", "I-record ang gas bilang gastos"],
+    ["off", "Huwag i-record ang gas (para sa net lang)"]
+].forEach(([value, label]) => {
+
+    const option = makeEl("option", "", label);
+
+    option.value = value;
+
+    workGasSelect.appendChild(option);
+
+});
+
+workGasSelect.value = settings.workGas === false ? "off" : "on";
+
+workGasSelect.addEventListener("change", () => {
+
+    settings.workGas = workGasSelect.value === "on";
+
+    saveSettings();
+
+    Object.keys(workLog).forEach(key => syncWorkGas(key));
+
+    renderMoney();
+
+    renderRecords();
+
+    showToast("Na-update ang gas");
+
+});
+
+moneySettingsSection.appendChild(workGasSelect);
 
 syncOldButton.addEventListener("click", () => {
 
@@ -5202,6 +5513,7 @@ syncOldButton.addEventListener("click", () => {
 
         return record &&
             record.worked &&
+            record.paid === true &&
             Number(record.pay) > 0 &&
             !transactions.some(t => t.source === "work" && t.workDate === key);
 
@@ -5278,7 +5590,7 @@ exportButton.addEventListener("click", () => {
 
     const backup = {
         app: "locked-in",
-        version: 7,
+        version: 8,
         exportedAt: new Date().toISOString(),
         data
     };
@@ -5571,7 +5883,7 @@ resetAllButton.addEventListener("click", () => {
 panel.appendChild(makeEl(
     "p",
     "li-note",
-    "LOCKED IN. v7 — Discipline today. Freedom tomorrow."
+    "LOCKED IN. v8 — Discipline today. Freedom tomorrow."
 ));
 
 function openSettings() {
