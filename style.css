@@ -1,4 +1,4 @@
- @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
     --bg: #09090d;
@@ -1441,4 +1441,213 @@ body.no-scroll {
     object-fit: cover;
     border-radius: 50%;
     margin-left: auto;
+}
+
+/* ==========================================================
+   V8 THEME — madilim at pula, mas matapang
+   (nasa dulo ng file para madaling alisin kung ayaw mo)
+   ========================================================== */
+
+:root {
+    --bg: #07070a;
+    --card: #101017;
+    --card-light: #181822;
+    --border: rgba(255, 255, 255, 0.08);
+    --red: #ff2d55;
+    --red-glow: rgba(255, 45, 85, 0.18);
+}
+
+html {
+    background: var(--bg);
+}
+
+body {
+    background:
+        radial-gradient(620px 360px at 85% -60px, rgba(255, 45, 85, 0.20), transparent 70%),
+        radial-gradient(520px 320px at -10% 320px, rgba(255, 45, 85, 0.07), transparent 70%),
+        var(--bg);
+    background-attachment: fixed;
+}
+
+/* Header at topbar */
+
+.topbar {
+    background: rgba(7, 7, 10, 0.82);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255, 45, 85, 0.22);
+}
+
+.menu-btn {
+    background: linear-gradient(160deg, #1b1b26, #101017);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.topbar-title {
+    letter-spacing: 0.4px;
+}
+
+.brand-icon {
+    font-size: 0;
+    background: linear-gradient(160deg, #ff5a78, #c4143a 60%, #7d0a24);
+    box-shadow: 0 0 18px rgba(255, 45, 85, 0.55);
+    clip-path: polygon(0 0, 100% 0, 100% 78%, 78% 100%, 0 100%);
+    border-radius: 6px;
+}
+
+.brand-icon::before {
+    content: "L";
+    font-size: 21px;
+    font-weight: 800;
+    font-style: italic;
+}
+
+/* Welcome */
+
+.welcome h1 {
+    letter-spacing: -1.5px;
+}
+
+.welcome h1 span {
+    background: linear-gradient(90deg, #ff5a78, #ff2d55 55%, #c4143a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+.eyebrow {
+    color: var(--red);
+    text-shadow: 0 0 14px rgba(255, 45, 85, 0.5);
+}
+
+/* Mga card */
+
+.stats-card,
+.progress-card,
+.calendar-card,
+.rec-card,
+.habit-item,
+.work-row,
+.date-section,
+.streak {
+    background: linear-gradient(165deg, #171722 0%, #0f0f16 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+        0 14px 34px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.stats-card,
+.progress-card,
+.calendar-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-card::before,
+.progress-card::before,
+.calendar-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 45, 85, 0.85), transparent);
+    pointer-events: none;
+}
+
+.entry {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Progress bar */
+
+.progress-fill,
+.chart-fill {
+    box-shadow: 0 0 14px rgba(255, 45, 85, 0.35);
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #c4143a, #ff2d55 60%, #ff7a92);
+}
+
+.work-stats .chart-fill,
+.chart-column.active .chart-fill {
+    box-shadow: 0 0 14px rgba(245, 166, 35, 0.4);
+}
+
+/* Mga button */
+
+.primary-btn,
+.habit-form button {
+    background: linear-gradient(160deg, #ff4d6d, #e01e46 60%, #b01236);
+    border: 0;
+    box-shadow: 0 8px 22px rgba(255, 45, 85, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    letter-spacing: 0.4px;
+}
+
+.primary-btn:active,
+.habit-form button:active {
+    transform: scale(0.97);
+}
+
+.ghost-btn,
+.toggle-btn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.field,
+.habit-form input {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.field:focus,
+.habit-form input:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(255, 45, 85, 0.18);
+    outline: none;
+}
+
+/* Calendar */
+
+.calendar-day:not(.weekday):not(.empty) {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.calendar-day.selected {
+    box-shadow: 0 0 0 2px var(--red), 0 0 16px rgba(255, 45, 85, 0.45);
+}
+
+/* Sidebar */
+
+.sidebar {
+    background: linear-gradient(180deg, #12121a 0%, #08080c 100%);
+    border-right: 1px solid rgba(255, 45, 85, 0.25);
+    box-shadow: 18px 0 50px rgba(0, 0, 0, 0.6);
+}
+
+.sb-item {
+    border: 1px solid transparent;
+}
+
+.sb-item.active {
+    background: linear-gradient(90deg, rgba(255, 45, 85, 0.22), rgba(255, 45, 85, 0.04));
+    border-color: rgba(255, 45, 85, 0.4);
+    box-shadow: inset 3px 0 0 var(--red);
+}
+
+.sb-group {
+    color: var(--red);
+    letter-spacing: 2px;
+}
+
+/* Footer */
+
+.footer p {
+    letter-spacing: 2px;
 }

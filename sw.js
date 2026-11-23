@@ -1,5 +1,5 @@
 // I-bump ang number na ito (v4, v5, ...) tuwing may binago ka sa files
-const CACHE_NAME = "locked-in-v4";
+const CACHE_NAME = "locked-in-v5";
 
 const FILES_TO_CACHE = [
     "./",
